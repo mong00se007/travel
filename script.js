@@ -162,12 +162,27 @@ function renderMapElements() {
             iconAnchor: [15, 15]
         });
 
+        // Build activities HTML
+        let activitiesHTML = '';
+        if (loc.activities.allDay) {
+            activitiesHTML += `<p style="margin: 5px 0;"><strong>🌞 All Day:</strong> ${loc.activities.allDay}</p>`;
+        }
+        if (loc.activities.morning) {
+            activitiesHTML += `<p style="margin: 5px 0;"><strong>🌅 Morning:</strong> ${loc.activities.morning}</p>`;
+        }
+        if (loc.activities.afternoon) {
+            activitiesHTML += `<p style="margin: 5px 0;"><strong>🌇 Afternoon:</strong> ${loc.activities.afternoon}</p>`;
+        }
+        if (!activitiesHTML) {
+            activitiesHTML = '<p style="margin: 5px 0; color: #888;">No activities set</p>';
+        }
+
         const marker = L.marker([loc.lat, loc.lng], { icon: customIcon })
             .addTo(map)
             .bindPopup(`
-                <div style="font-family: 'Outfit', sans-serif; color: #0f172a; text-align: center;">
-                    <h3 style="margin: 0 0 5px 0; color: #00d2ff;">${loc.name}</h3>
-                    <p style="margin: 0;">${loc.activities.morning || loc.activities.afternoon || loc.activities.allDay || 'No activities set'}</p>
+                <div style="font-family: 'Outfit', sans-serif; color: #0f172a; min-width: 200px;">
+                    <h3 style="margin: 0 0 10px 0; color: #00d2ff; text-align: center;">${loc.name}</h3>
+                    ${activitiesHTML}
                 </div>
             `);
 
@@ -286,6 +301,9 @@ function renderItineraryList() {
                     <div class="card-number">${index + 1}</div>
                     <h3 class="card-title">${loc.name}</h3>
                 </div>
+                <div class="card-weather" id="weather-${loc.id}">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                </div>
                 <div class="card-actions">
                     <button class="card-action-btn edit" onclick="event.stopPropagation(); editLocation('${loc.id}')" title="Edit">
                         <i class="fa-solid fa-pen"></i>
@@ -309,11 +327,20 @@ function renderItineraryList() {
             </div>
         `;
 
-        // Add click handler to toggle expanded state
+        // Fetch weather
+        fetchWeather(loc.lat, loc.lng, `weather-${loc.id}`);
+
+        // Add click handler to toggle expanded state and center map
         card.addEventListener('click', function (e) {
             // Don't toggle if clicking on action buttons
             if (e.target.closest('.card-action-btn')) return;
             this.classList.toggle('expanded');
+
+            // Center map on this location
+            map.setView([loc.lat, loc.lng], 10, {
+                animate: true,
+                duration: 0.5
+            });
         });
 
         itineraryList.appendChild(card);
@@ -360,17 +387,9 @@ function openModal(editId = null) {
         });
     });
 
-    // Travel Mode Selector Logic
+    // Travel Mode Selector Logic - Reset active state
     const modeButtons = document.querySelectorAll('.travel-mode-btn');
-    const travelModeInput = document.getElementById('travelMode');
-
-    modeButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            modeButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            travelModeInput.value = btn.dataset.mode;
-        });
-    });
+    modeButtons.forEach(btn => btn.classList.remove('active'));
 
     if (editId) {
         // Edit Mode
@@ -382,7 +401,14 @@ function openModal(editId = null) {
         document.getElementById('locationName').value = loc.name;
         document.getElementById('imageUrl').value = loc.imageUrl;
         document.getElementById('travelTime').value = loc.travelTime;
-        document.getElementById('travelMode').value = loc.travelMode || '';
+        const mode = loc.travelMode || '';
+        document.getElementById('travelMode').value = mode;
+
+        // Set active button
+        if (mode) {
+            const activeBtn = document.querySelector(`.travel-mode-btn[data-mode="${mode}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
         document.getElementById('placeToStay').value = loc.placeToStay;
         document.getElementById('morningActivity').value = loc.activities.morning;
         document.getElementById('afternoonActivity').value = loc.activities.afternoon;
@@ -484,6 +510,18 @@ function setupEventListeners() {
             deleteLocation(id);
         }
     });
+
+    // Travel Mode Selector Buttons
+    const modeButtons = document.querySelectorAll('.travel-mode-btn');
+    const travelModeInput = document.getElementById('travelMode');
+
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            travelModeInput.value = btn.dataset.mode;
+        });
+    });
 }
 
 // Helper Functions
@@ -505,6 +543,53 @@ function updateStats() {
 
 function saveData() {
     localStorage.setItem('wanderlust_locations', JSON.stringify(locations));
+}
+
+// Weather Functions
+async function fetchWeather(lat, lng, elementId) {
+    try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        const data = await response.json();
+
+        if (data.current_weather) {
+            const temp = Math.round(data.current_weather.temperature);
+            const code = data.current_weather.weathercode;
+            const iconClass = getWeatherIcon(code);
+
+            const weatherEl = document.getElementById(elementId);
+            if (weatherEl) {
+                weatherEl.innerHTML = `<i class="${iconClass}"></i> ${temp}°C`;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching weather:', error);
+        const weatherEl = document.getElementById(elementId);
+        if (weatherEl) {
+            weatherEl.style.display = 'none';
+        }
+    }
+}
+
+function getWeatherIcon(code) {
+    // WMO Weather interpretation codes (WW)
+    // 0: Clear sky
+    if (code === 0) return 'fa-solid fa-sun';
+    // 1, 2, 3: Mainly clear, partly cloudy, and overcast
+    if ([1, 2, 3].includes(code)) return 'fa-solid fa-cloud-sun';
+    // 45, 48: Fog
+    if ([45, 48].includes(code)) return 'fa-solid fa-smog';
+    // 51, 53, 55: Drizzle
+    if ([51, 53, 55].includes(code)) return 'fa-solid fa-cloud-rain';
+    // 61, 63, 65: Rain
+    if ([61, 63, 65].includes(code)) return 'fa-solid fa-cloud-showers-heavy';
+    // 71, 73, 75: Snow fall
+    if ([71, 73, 75].includes(code)) return 'fa-solid fa-snowflake';
+    // 80, 81, 82: Rain showers
+    if ([80, 81, 82].includes(code)) return 'fa-solid fa-cloud-showers-water';
+    // 95, 96, 99: Thunderstorm
+    if ([95, 96, 99].includes(code)) return 'fa-solid fa-bolt';
+
+    return 'fa-solid fa-cloud';
 }
 
 // Export/Import Functions

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Travel Planner - Plan Your Perfect Journey</title>
+    <link rel="icon" type="image/png" href="favicon.png">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -124,14 +125,24 @@
 
                     <div class="form-group">
                         <label for="travelMode">Travel Mode</label>
-                        <select id="travelMode">
-                            <option value="">None</option>
-                            <option value="walking">Walking</option>
-                            <option value="biking">🚴 Biking</option>
-                            <option value="car">🚗 Car</option>
-                            <option value="boat">⛵ Boat</option>
-                            <option value="plane">✈️ Plane</option>
-                        </select>
+                        <input type="hidden" id="travelMode">
+                        <div class="travel-mode-selector">
+                            <button type="button" class="travel-mode-btn" data-mode="walking" title="Walking">
+                                <i class="fa-solid fa-person-walking"></i>
+                            </button>
+                            <button type="button" class="travel-mode-btn" data-mode="biking" title="Biking">
+                                <i class="fa-solid fa-person-biking"></i>
+                            </button>
+                            <button type="button" class="travel-mode-btn" data-mode="car" title="Car">
+                                <i class="fa-solid fa-car"></i>
+                            </button>
+                            <button type="button" class="travel-mode-btn" data-mode="boat" title="Boat">
+                                <i class="fa-solid fa-sailboat"></i>
+                            </button>
+                            <button type="button" class="travel-mode-btn" data-mode="plane" title="Plane">
+                                <i class="fa-solid fa-plane"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="form-group">
