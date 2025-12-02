@@ -28,7 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Map Initialization
 function initMap() {
     // Default view (Europe)
-    map = L.map('map').setView([48.8566, 2.3522], 5);
+    map = L.map('map', {
+        dragging: !L.Browser.mobile
+    }).setView([48.8566, 2.3522], 5);
 
     // Initialize with current theme
     setMapTheme(currentTheme);

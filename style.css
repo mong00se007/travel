@@ -615,23 +615,39 @@ textarea:focus {
 
 /* Responsive */
 @media (max-width: 900px) {
+
+    /* Keep app wrapper fixed height to enable internal scrolling */
     .app-wrapper {
-        height: auto;
-        overflow-y: auto;
+        height: 100vh;
+        overflow: hidden;
     }
 
     .main-content {
         flex-direction: column;
+        min-height: 0;
+        /* Crucial for nested flex scrolling */
     }
 
     .map-section {
-        height: 400px;
+        height: 40vh;
+        /* Use vh instead of fixed px for better scaling */
+        min-height: 300px;
         flex: none;
     }
 
     .itinerary-section {
         min-width: 0;
-        height: auto;
+        flex: 1;
+        /* Take remaining space */
+        min-height: 0;
+        /* Crucial for nested flex scrolling */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .itinerary-list {
+        flex: 1;
+        overflow-y: auto;
     }
 }
 

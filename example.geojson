@@ -1,0 +1,155 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1340507893093368,
+          51.494260403367896
+        ]
+      },
+      "properties": {
+        "id": "1764643470495",
+        "name": "London",
+        "imageUrl": "https://prodmediawebuildvalue.alkemy.digital/wp-content/uploads/2020/10/grattacieli-londra-skyline.jpeg",
+        "travelTime": "flight 12 hours",
+        "placeToStay": "hotel",
+        "activities": {
+          "morning": "big ben",
+          "afternoon": "zoo",
+          "allDay": "sleep"
+        },
+        "kidsActivity": "run around",
+        "foodOptions": "gluten free pies",
+        "funFact": "it is big"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          5.343165393191015,
+          51.89673797431143
+        ]
+      },
+      "properties": {
+        "id": "1764632868957",
+        "name": "Netherlands",
+        "imageUrl": "https://www.aesdes.org/wp-content/uploads/2017/03/windmill.jpg",
+        "travelTime": "",
+        "placeToStay": "",
+        "activities": {
+          "morning": "sleep",
+          "afternoon": "breakfast at noon",
+          "allDay": "party"
+        },
+        "kidsActivity": "zoo",
+        "foodOptions": "mcds",
+        "funFact": "roads are long"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.416068127357565,
+          48.911501253019146
+        ]
+      },
+      "properties": {
+        "id": "1764649134280",
+        "name": "Bavaria",
+        "imageUrl": "",
+        "travelTime": "",
+        "placeToStay": "",
+        "activities": {
+          "morning": "",
+          "afternoon": "",
+          "allDay": ""
+        },
+        "kidsActivity": "",
+        "foodOptions": "",
+        "funFact": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19,
+          42
+        ]
+      },
+      "properties": {
+        "id": "1764619981828",
+        "name": "Zagreb",
+        "imageUrl": "https://www.gpsmycity.com/img/gd_cover/3245.jpg",
+        "travelTime": "",
+        "placeToStay": "",
+        "activities": {
+          "morning": "stroll",
+          "afternoon": "",
+          "allDay": ""
+        },
+        "kidsActivity": "zoo",
+        "foodOptions": "",
+        "funFact": "some fact"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0,
+          39.27698336924602
+        ]
+      },
+      "properties": {
+        "id": "1764643506101",
+        "name": "spain",
+        "imageUrl": "",
+        "travelTime": "",
+        "placeToStay": "",
+        "activities": {
+          "morning": "",
+          "afternoon": "",
+          "allDay": ""
+        },
+        "kidsActivity": "",
+        "foodOptions": "",
+        "funFact": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.291066821748524,
+          43.72842958959881
+        ]
+      },
+      "properties": {
+        "id": "1764644042493",
+        "name": "Florence",
+        "imageUrl": "https://images.locationscout.net/2021/08/florence-skyline-italy-hbpv.jpg?h=1100&q=83",
+        "travelTime": "",
+        "placeToStay": "Shereton",
+        "activities": {
+          "morning": "walk around",
+          "afternoon": "Picnic",
+          "allDay": "Be happy"
+        },
+        "kidsActivity": "ice creams",
+        "foodOptions": "gluten free pizza",
+        "funFact": "florence rhyms with lawrence"
+      }
+    }
+  ]
+}
