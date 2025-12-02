@@ -13,6 +13,16 @@
     --font-body: 'Outfit', sans-serif;
 }
 
+.light-mode {
+    --bg-dark: #f0f2f5;
+    --bg-card: rgba(255, 255, 255, 0.8);
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+    --gradient-bg: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -138,6 +148,7 @@ body {
 }
 
 #map {
+    cursor: crosshair;
     height: 100%;
     width: 100%;
     z-index: 1;
@@ -156,6 +167,24 @@ body {
     border: 1px solid var(--border-color);
     font-size: 0.9rem;
     pointer-events: none;
+}
+
+.map-travel-time {
+    background: var(--bg-card);
+    backdrop-filter: blur(4px);
+    color: var(--text-main);
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--primary-color);
+    font-size: 0.95rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.map-travel-time::before {
+    display: none !important;
 }
 
 /* Itinerary Section */

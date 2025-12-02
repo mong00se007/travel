@@ -1,9 +1,12 @@
 // State Management
 let locations = JSON.parse(localStorage.getItem('wanderlust_locations')) || [];
 let map;
+let mapTileLayer;
 let markers = [];
+let travelTimeMarkers = [];
 let polyline;
 let tempClickCoords = null;
+let currentTheme = localStorage.getItem('travel_planner_theme') || 'dark';
 
 // DOM Elements
 const locationModal = document.getElementById('locationModal');
@@ -11,6 +14,7 @@ const locationForm = document.getElementById('locationForm');
 const itineraryList = document.getElementById('itineraryList');
 const locationCount = document.getElementById('locationCount');
 const resetBtn = document.getElementById('resetBtn');
+const themeToggleBtn = document.getElementById('themeToggle');
 // Save button removed - app auto-saves to localStorage
 
 // Initialize App
@@ -26,18 +30,59 @@ function initMap() {
     // Default view (Europe)
     map = L.map('map').setView([48.8566, 2.3522], 5);
 
-    // Dark/Modern Map Tiles (CartoDB Dark Matter)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">Open Street Map</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    }).addTo(map);
+    // Initialize with current theme
+    setMapTheme(currentTheme);
+    updateThemeIcon();
 
     // Map Click Handler
     map.on('click', (e) => {
         tempClickCoords = e.latlng;
         openModal();
     });
+}
+
+// Set Map Theme
+function setMapTheme(theme) {
+    // Remove existing tile layer if it exists
+    if (mapTileLayer) {
+        map.removeLayer(mapTileLayer);
+    }
+
+    if (theme === 'dark') {
+        // Dark mode - CartoDB Dark Matter
+        mapTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+    } else {
+        // Light mode - ArcGIS NatGeo World Map
+        mapTileLayer = L.tileLayer('http://services.arcgisonline.com/arcgis/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com">Esri</a>, NatGeo',
+            maxZoom: 20
+        }).addTo(map);
+    }
+}
+
+// Toggle Theme
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('travel_planner_theme', currentTheme);
+
+    setMapTheme(currentTheme);
+    updateThemeIcon();
+    renderMapElements(); // Re-render to update polyline color
+}
+
+// Update Theme Icon
+function updateThemeIcon() {
+    const icon = themeToggleBtn.querySelector('i');
+    if (currentTheme === 'dark') {
+        icon.className = 'fa-solid fa-moon';
+    } else {
+        icon.className = 'fa-solid fa-sun';
+    }
 }
 
 // Render App (Map Markers + Itinerary Cards)
@@ -47,11 +92,52 @@ function renderApp() {
     updateStats();
 }
 
+// Calculate distance between two points (Haversine formula)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+}
+
+// Estimate travel time based on mode and distance
+function estimateTravelTime(distance, mode) {
+    // Average speeds in km/h
+    const speeds = {
+        'walking': 5,
+        'biking': 15,
+        'car': 40,  // Reduced from 60 to add ~50% more time for realistic estimates
+        'boat': 30,
+        'plane': 500
+    };
+
+    const speed = speeds[mode] || 50; // Default 50 km/h if no mode
+    const hours = distance / speed;
+
+    if (hours < 1) {
+        const minutes = Math.round(hours * 60);
+        return `~${minutes}min`;
+    } else if (hours < 24) {
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        return m > 0 ? `~${h}h ${m}min` : `~${h}h`;
+    } else {
+        const days = Math.round(hours / 24 * 10) / 10;
+        return `~${days} days`;
+    }
+}
+
 // Render Map Elements (Markers & Polyline)
 function renderMapElements() {
     // Clear existing
     markers.forEach(marker => map.removeLayer(marker));
     markers = [];
+    travelTimeMarkers.forEach(marker => map.removeLayer(marker));
+    travelTimeMarkers = [];
     if (polyline) map.removeLayer(polyline);
 
     // Add Markers
@@ -91,13 +177,72 @@ function renderMapElements() {
     // Draw Polyline
     if (locations.length > 1) {
         const latlngs = locations.map(loc => [loc.lat, loc.lng]);
+        // Black lines for light mode (NatGeo map), Cyan for dark mode
+        const lineColor = currentTheme === 'light' ? '#000000' : '#00d2ff';
+
         polyline = L.polyline(latlngs, {
-            color: '#00d2ff',
+            color: lineColor,
             weight: 3,
             opacity: 0.7,
             dashArray: '10, 10',
             lineCap: 'round'
         }).addTo(map);
+
+        // Add travel time labels at midpoints
+        for (let i = 0; i < locations.length - 1; i++) {
+            const currentLoc = locations[i];
+            const nextLoc = locations[i + 1];
+
+            // Determine travel time to display
+            let displayTime = nextLoc.travelTime && nextLoc.travelTime.trim() !== ''
+                ? nextLoc.travelTime
+                : '';
+
+            // If no manual time and we have a mode, estimate it
+            if (!displayTime && nextLoc.travelMode) {
+                const distance = calculateDistance(
+                    currentLoc.lat, currentLoc.lng,
+                    nextLoc.lat, nextLoc.lng
+                );
+                displayTime = estimateTravelTime(distance, nextLoc.travelMode);
+            }
+
+            // Only add label if we have time to display
+            if (displayTime) {
+                // Calculate midpoint between two markers
+                const midLat = (currentLoc.lat + nextLoc.lat) / 2;
+                const midLng = (currentLoc.lng + nextLoc.lng) / 2;
+
+                // Create custom icon for travel time label
+                // Use black text for light mode, white for dark mode
+                const textColor = currentTheme === 'light' ? '#000000' : '#f8fafc';
+
+                // Get travel mode icon
+                const modeIcons = {
+                    'walking': '<i class="fa-solid fa-person-walking" style="margin-right: 4px;"></i>',
+                    'biking': '<i class="fa-solid fa-person-biking" style="margin-right: 4px;"></i>',
+                    'car': '<i class="fa-solid fa-car" style="margin-right: 4px;"></i>',
+                    'boat': '<i class="fa-solid fa-sailboat" style="margin-right: 4px;"></i>',
+                    'plane': '<i class="fa-solid fa-plane" style="margin-right: 4px;"></i>'
+                };
+                const modeIcon = nextLoc.travelMode && modeIcons[nextLoc.travelMode] ? modeIcons[nextLoc.travelMode] : '';
+
+                const travelTimeIcon = L.divIcon({
+                    className: 'map-travel-time',
+                    html: `<div style="text-align: center; color: ${textColor};">${modeIcon}${displayTime}</div>`,
+                    iconSize: null,
+                    iconAnchor: null
+                });
+
+                // Add invisible marker with the travel time label
+                const travelTimeMarker = L.marker([midLat, midLng], {
+                    icon: travelTimeIcon,
+                    interactive: false
+                }).addTo(map);
+
+                travelTimeMarkers.push(travelTimeMarker);
+            }
+        }
     }
 }
 
@@ -215,6 +360,18 @@ function openModal(editId = null) {
         });
     });
 
+    // Travel Mode Selector Logic
+    const modeButtons = document.querySelectorAll('.travel-mode-btn');
+    const travelModeInput = document.getElementById('travelMode');
+
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            travelModeInput.value = btn.dataset.mode;
+        });
+    });
+
     if (editId) {
         // Edit Mode
         const loc = locations.find(l => l.id === editId);
@@ -225,6 +382,7 @@ function openModal(editId = null) {
         document.getElementById('locationName').value = loc.name;
         document.getElementById('imageUrl').value = loc.imageUrl;
         document.getElementById('travelTime').value = loc.travelTime;
+        document.getElementById('travelMode').value = loc.travelMode || '';
         document.getElementById('placeToStay').value = loc.placeToStay;
         document.getElementById('morningActivity').value = loc.activities.morning;
         document.getElementById('afternoonActivity').value = loc.activities.afternoon;
@@ -268,6 +426,7 @@ function setupEventListeners() {
             name: document.getElementById('locationName').value,
             imageUrl: document.getElementById('imageUrl').value,
             travelTime: document.getElementById('travelTime').value,
+            travelMode: document.getElementById('travelMode').value,
             placeToStay: document.getElementById('placeToStay').value,
             activities: {
                 morning: document.getElementById('morningActivity').value,
@@ -299,6 +458,9 @@ function setupEventListeners() {
             saveData();
         }
     });
+
+    // Theme Toggle Button
+    themeToggleBtn.addEventListener('click', toggleTheme);
 
     // Export Button
     document.getElementById('exportBtn').addEventListener('click', exportItinerary);
@@ -347,13 +509,35 @@ function saveData() {
 
 // Export/Import Functions
 function exportItinerary() {
-    const dataStr = JSON.stringify(locations, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+    const geoJSON = {
+        type: "FeatureCollection",
+        features: locations.map(loc => ({
+            type: "Feature",
+            geometry: {
+                type: "Point",
+                coordinates: [loc.lng, loc.lat]
+            },
+            properties: {
+                id: loc.id,
+                name: loc.name,
+                imageUrl: loc.imageUrl,
+                travelTime: loc.travelTime,
+                placeToStay: loc.placeToStay,
+                activities: loc.activities,
+                kidsActivity: loc.kidsActivity,
+                foodOptions: loc.foodOptions,
+                funFact: loc.funFact
+            }
+        }))
+    };
+
+    const dataStr = JSON.stringify(geoJSON, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/geo+json' });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'wanderlust_itinerary.json';
+    a.download = 'wanderlust_itinerary.geojson';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -368,19 +552,47 @@ function importItinerary(event) {
     reader.onload = function (e) {
         try {
             const importedData = JSON.parse(e.target.result);
-            if (Array.isArray(importedData)) {
+
+            // Check if it's a valid GeoJSON FeatureCollection
+            if (importedData.type === "FeatureCollection" && Array.isArray(importedData.features)) {
                 if (confirm('Importing will replace your current itinerary. Continue?')) {
+                    locations = importedData.features.map(feature => {
+                        const props = feature.properties;
+                        const coords = feature.geometry.coordinates; // [lng, lat]
+
+                        return {
+                            id: props.id || Date.now().toString() + Math.random(),
+                            lat: coords[1],
+                            lng: coords[0],
+                            name: props.name || "Unnamed Location",
+                            imageUrl: props.imageUrl || "",
+                            travelTime: props.travelTime || "",
+                            placeToStay: props.placeToStay || "",
+                            activities: props.activities || { morning: "", afternoon: "", allDay: "" },
+                            kidsActivity: props.kidsActivity || "",
+                            foodOptions: props.foodOptions || "",
+                            funFact: props.funFact || ""
+                        };
+                    });
+
+                    renderApp();
+                    saveData();
+                    alert('Itinerary imported successfully from GeoJSON!');
+                }
+            } else if (Array.isArray(importedData)) {
+                // Backward compatibility for old JSON array format
+                if (confirm('Legacy format detected. Importing will replace your current itinerary. Continue?')) {
                     locations = importedData;
                     renderApp();
                     saveData();
                     alert('Itinerary imported successfully!');
                 }
             } else {
-                alert('Invalid file format: Data must be an array of locations.');
+                alert('Invalid file format: Must be a GeoJSON FeatureCollection or a valid JSON array.');
             }
         } catch (error) {
             console.error('Import Error:', error);
-            alert('Error importing file. Please make sure it is a valid JSON file.');
+            alert('Error importing file. Please make sure it is a valid JSON/GeoJSON file.');
         }
         // Reset input
         event.target.value = '';
