@@ -2,4 +2,7 @@ Just click on the map add the place, you can rearange the place cards as well as
 
 Features to implement:
 Better mobile suport
-add weather
+
+https://mong00se007.github.io/travel/
+
+to try before you download
