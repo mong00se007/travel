@@ -487,6 +487,28 @@ function setupEventListeners() {
         }
     });
 
+    // Info Modal
+    const infoBtn = document.getElementById('infoBtn');
+    const infoModal = document.getElementById('infoModal');
+    const closeInfoModal = document.getElementById('closeInfoModal');
+
+    if (infoBtn && infoModal && closeInfoModal) {
+        infoBtn.addEventListener('click', () => {
+            infoModal.classList.add('active');
+        });
+
+        closeInfoModal.addEventListener('click', () => {
+            infoModal.classList.remove('active');
+        });
+
+        // Close info modal when clicking outside
+        infoModal.addEventListener('click', (e) => {
+            if (e.target === infoModal) {
+                infoModal.classList.remove('active');
+            }
+        });
+    }
+
     // Theme Toggle Button
     themeToggleBtn.addEventListener('click', toggleTheme);
 

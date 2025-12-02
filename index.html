@@ -36,6 +36,9 @@
                 <button id="themeToggle" class="btn btn-secondary" title="Toggle Dark/Light Mode">
                     <i class="fa-solid fa-moon"></i>
                 </button>
+                <button id="infoBtn" class="btn btn-secondary" title="About">
+                    <i class="fa-solid fa-info-circle"></i>
+                </button>
                 <input type="file" id="importFile" accept=".geojson, .json" style="display: none;">
                 <button id="importBtn" class="btn btn-secondary" title="Import from File">
                     <i class="fa-solid fa-file-import"></i> Import
@@ -186,6 +189,24 @@
                         <button type="submit" class="btn btn-primary">Save Location</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div class="modal" id="infoModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>About</h2>
+                <button class="close-modal" id="closeInfoModal"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="info-content">
+                    <p><strong>Made with Google Antigravity AI</strong></p>
+                    <p>Uses <a href="https://open-meteo.com/" target="_blank"
+                            rel="noopener noreferrer">https://open-meteo.com/</a> for weather API</p>
+                    <p>Made by L vdHelm 2025</p>
+                </div>
             </div>
         </div>
     </div>
