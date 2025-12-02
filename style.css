@@ -613,6 +613,33 @@ textarea:focus {
     }
 }
 
+/* Info Modal Content */
+.info-content {
+    line-height: 1.8;
+}
+
+.info-content p {
+    margin-bottom: 1rem;
+    font-weight: normal;
+}
+
+.info-content strong {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.info-content a {
+    color: #60d5ff;
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: normal;
+}
+
+.info-content a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
 
@@ -730,13 +757,14 @@ textarea:focus {
         width: 100%;
         justify-content: center;
         flex-wrap: wrap;
-        gap: 0.4rem;
+        gap: 0.3rem;
     }
 
-    /* Reduce button padding for better fit on small screens */
+    /* Make buttons more compact on mobile */
     .btn {
-        padding: 0.5rem 0.8rem;
-        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+        gap: 0.3rem;
     }
 
     .main-content {
