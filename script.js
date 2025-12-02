@@ -1,5 +1,5 @@
 // State Management
-let locations = JSON.parse(localStorage.getItem('wanderlust_locations')) || [];
+let locations = JSON.parse(localStorage.getItem('travel_planner_locations')) || [];
 let map;
 let mapTileLayer;
 let markers = [];
@@ -544,7 +544,7 @@ function updateStats() {
 }
 
 function saveData() {
-    localStorage.setItem('wanderlust_locations', JSON.stringify(locations));
+    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
 }
 
 // Weather Functions
@@ -624,7 +624,7 @@ function exportItinerary() {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'wanderlust_itinerary.geojson';
+    a.download = 'travel_planner_itinerary.geojson';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
