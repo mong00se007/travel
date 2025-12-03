@@ -424,6 +424,8 @@ function setupDragAndDrop() {
         ghostClass: 'sortable-ghost',
         dragClass: 'sortable-drag',
         handle: '.location-card', // Make whole card draggable
+        delay: 200, // Delay for touch devices to allow scrolling/tapping
+        delayOnTouchOnly: true,
         onEnd: function (evt) {
             const itemEl = evt.item;
             const newIndex = evt.newIndex;
