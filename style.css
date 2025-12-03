@@ -842,3 +842,22 @@ textarea:focus {
         opacity: 1 !important;
     }
 }
+
+/* Mobile Landscape Mode */
+@media (max-width: 900px) and (orientation: landscape) {
+    .map-section {
+        height: 50vh;
+        /* Reduce map height in landscape */
+        min-height: 200px;
+    }
+
+    .itinerary-section {
+        height: auto;
+        overflow: visible;
+    }
+
+    body {
+        overflow-y: auto;
+        /* Ensure body scrolls */
+    }
+}
