@@ -697,6 +697,22 @@ textarea:focus {
         flex: 1;
         overflow-y: auto;
     }
+
+    /* Fix card expansion on mobile */
+    .location-card.expanded {
+        height: auto !important;
+        max-height: none !important;
+    }
+
+    .card-content {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Make action buttons always visible on mobile */
+    .card-actions {
+        opacity: 1 !important;
+    }
 }
 
 /* Travel Mode Selector */
@@ -808,5 +824,21 @@ textarea:focus {
 
     .itinerary-list {
         overflow-y: visible;
+    }
+
+    /* Fix card expansion on mobile */
+    .location-card.expanded {
+        height: auto !important;
+        max-height: none !important;
+    }
+
+    .card-content {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Make action buttons always visible on mobile */
+    .card-actions {
+        opacity: 1 !important;
     }
 }

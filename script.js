@@ -357,10 +357,18 @@ function renderItineraryList() {
 
         const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80';
 
-        // Activity Summary
-        let activitySummary = '';
-        if (loc.activities && (loc.activities.morning || loc.activities.afternoon || loc.activities.evening)) {
-            activitySummary = '<div class="detail-row"><i class="fa-solid fa-list-check"></i> <span>Activities planned</span></div>';
+        // Build activities HTML
+        let activitiesHTML = '';
+        if (loc.activities) {
+            if (loc.activities.allDay) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-calendar-day"></i> <span><strong>All Day:</strong> ${loc.activities.allDay}</span></div>`;
+            }
+            if (loc.activities.morning) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-sun"></i> <span><strong>Morning:</strong> ${loc.activities.morning}</span></div>`;
+            }
+            if (loc.activities.afternoon) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-cloud-sun"></i> <span><strong>Afternoon:</strong> ${loc.activities.afternoon}</span></div>`;
+            }
         }
 
         card.innerHTML = `
@@ -390,7 +398,7 @@ function renderItineraryList() {
                     ${loc.placeToStay ? `<div class="meta-item"><i class="fa-solid fa-bed"></i> ${loc.placeToStay}</div>` : ''}
                 </div>
                 <div class="card-details">
-                    ${activitySummary}
+                    ${activitiesHTML}
                     ${loc.kidsActivity ? `<div class="detail-row"><i class="fa-solid fa-child-reaching"></i> <span>Kids: ${loc.kidsActivity}</span></div>` : ''}
                     ${loc.foodOptions ? `<div class="detail-row"><i class="fa-solid fa-utensils"></i> <span>Food: ${loc.foodOptions}</span></div>` : ''}
                     ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb" style="color: #ffaa00; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
