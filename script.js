@@ -142,24 +142,42 @@ function renderMapElements() {
     travelTimeMarkers = [];
     if (polyline) map.removeLayer(polyline);
 
+    let activeCount = 0;
+    const activeLocations = locations.filter(l => !l.disabled);
+
     // Add Markers
     locations.forEach((loc, index) => {
+        let markerContent = '';
+        let markerColor = '#00d2ff'; // Default Cyan
+        let markerBorder = '#0f172a';
+        let zIndex = 1000;
+
+        if (loc.disabled) {
+            markerColor = '#64748b'; // Grey for disabled
+            markerContent = '<i class="fa-solid fa-eye-slash" style="font-size: 12px;"></i>';
+            zIndex = 500;
+        } else {
+            activeCount++;
+            markerContent = activeCount;
+        }
+
         const customIcon = L.divIcon({
             className: 'custom-map-marker',
             html: `<div style="
-                background-color: #00d2ff;
+                background-color: ${markerColor};
                 width: 30px;
                 height: 30px;
                 border-radius: 50%;
-                border: 3px solid #0f172a;
+                border: 3px solid ${markerBorder};
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: #0f172a;
+                color: ${markerBorder};
                 font-weight: bold;
                 font-family: 'Outfit', sans-serif;
                 box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            ">${index + 1}</div>`,
+                opacity: ${loc.disabled ? 0.7 : 1};
+            ">${markerContent}</div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15]
         });
@@ -179,11 +197,14 @@ function renderMapElements() {
             activitiesHTML = '<p style="margin: 5px 0; color: #888;">No activities set</p>';
         }
 
-        const marker = L.marker([loc.lat, loc.lng], { icon: customIcon })
+        const marker = L.marker([loc.lat, loc.lng], {
+            icon: customIcon,
+            zIndexOffset: zIndex
+        })
             .addTo(map)
             .bindPopup(`
                 <div style="font-family: 'Outfit', sans-serif; color: #0f172a; min-width: 200px;">
-                    <h3 style="margin: 0 0 10px 0; color: #00d2ff; text-align: center;">${loc.name}</h3>
+                    <h3 style="margin: 0 0 10px 0; color: ${markerColor}; text-align: center;">${loc.name} ${loc.disabled ? '(Disabled)' : ''}</h3>
                     ${activitiesHTML}
                 </div>
             `);
@@ -191,9 +212,9 @@ function renderMapElements() {
         markers.push(marker);
     });
 
-    // Draw Polyline
-    if (locations.length > 1) {
-        const latlngs = locations.map(loc => [loc.lat, loc.lng]);
+    // Draw Polyline (Only for active locations)
+    if (activeLocations.length > 1) {
+        const latlngs = activeLocations.map(loc => [loc.lat, loc.lng]);
         // Black lines for light mode (NatGeo map), Cyan for dark mode
         const lineColor = currentTheme === 'light' ? '#000000' : '#00d2ff';
 
@@ -206,9 +227,9 @@ function renderMapElements() {
         }).addTo(map);
 
         // Add travel time labels at midpoints
-        for (let i = 0; i < locations.length - 1; i++) {
-            const currentLoc = locations[i];
-            const nextLoc = locations[i + 1];
+        for (let i = 0; i < activeLocations.length - 1; i++) {
+            const currentLoc = activeLocations[i];
+            const nextLoc = activeLocations[i + 1];
 
             // Determine travel time to display
             let displayTime = nextLoc.travelTime && nextLoc.travelTime.trim() !== ''
@@ -263,6 +284,49 @@ function renderMapElements() {
     }
 }
 
+function toggleDisable(id) {
+    const locIndex = locations.findIndex(l => l.id === id);
+    if (locIndex === -1) return;
+
+    const loc = locations[locIndex];
+    loc.disabled = !loc.disabled;
+
+    // Remove from current position
+    locations.splice(locIndex, 1);
+
+    if (loc.disabled) {
+        // If disabling, move to end of list
+        locations.push(loc);
+    } else {
+        // If enabling, move to end of ACTIVE items (before first disabled item)
+        const firstDisabledIndex = locations.findIndex(l => l.disabled);
+        if (firstDisabledIndex === -1) {
+            locations.push(loc);
+        } else {
+            locations.splice(firstDisabledIndex, 0, loc);
+        }
+    }
+
+    renderApp();
+    saveData();
+}
+
+function deleteLocation(id) {
+    if (confirm('Delete this location?')) {
+        locations = locations.filter(l => l.id !== id);
+        renderApp();
+        saveData();
+    }
+}
+
+function updateStats() {
+    locationCount.innerText = `${locations.length} Stop${locations.length !== 1 ? 's' : ''}`;
+}
+
+function saveData() {
+    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
+}
+
 // Render Itinerary List
 function renderItineraryList() {
     itineraryList.innerHTML = '';
@@ -271,42 +335,47 @@ function renderItineraryList() {
         itineraryList.innerHTML = `
             <div class="empty-state">
                 <i class="fa-solid fa-map-location-dot"></i>
-                <p>Start your journey by clicking on the map!</p>
+                <p>No locations added yet. Click on the map to start planning!</p>
             </div>
         `;
         return;
     }
 
+    let activeCount = 0;
+
     locations.forEach((loc, index) => {
         const card = document.createElement('div');
-        card.className = 'location-card';
+        card.className = `location-card ${loc.disabled ? 'disabled' : ''}`;
         card.dataset.id = loc.id;
 
-        // Default image if none provided
-        const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
+        // Calculate number only for active items
+        let displayNumber = '';
+        if (!loc.disabled) {
+            activeCount++;
+            displayNumber = activeCount;
+        }
 
-        // Activity Summary - show all activities
+        const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80';
+
+        // Activity Summary
         let activitySummary = '';
-        if (loc.activities.allDay) {
-            activitySummary += `<div class="detail-row"><i class="fa-solid fa-calendar-day"></i> <span>${loc.activities.allDay}</span></div>`;
-        }
-        if (loc.activities.morning) {
-            activitySummary += `<div class="detail-row"><i class="fa-solid fa-sun"></i> <span>${loc.activities.morning}</span></div>`;
-        }
-        if (loc.activities.afternoon) {
-            activitySummary += `<div class="detail-row"><i class="fa-solid fa-cloud-sun"></i> <span>${loc.activities.afternoon}</span></div>`;
+        if (loc.activities && (loc.activities.morning || loc.activities.afternoon || loc.activities.evening)) {
+            activitySummary = '<div class="detail-row"><i class="fa-solid fa-list-check"></i> <span>Activities planned</span></div>';
         }
 
         card.innerHTML = `
             <div class="card-image" style="background-image: url('${bgImage}')">
                 <div class="card-header-overlay">
-                    <div class="card-number">${index + 1}</div>
+                    ${!loc.disabled ? `<div class="card-number">${displayNumber}</div>` : ''}
                     <h3 class="card-title">${loc.name}</h3>
                 </div>
                 <div class="card-weather" id="weather-${loc.id}">
                     <i class="fa-solid fa-spinner fa-spin"></i>
                 </div>
                 <div class="card-actions">
+                    <button class="card-action-btn disable" onclick="event.stopPropagation(); toggleDisable('${loc.id}')" title="${loc.disabled ? 'Enable' : 'Disable'}">
+                        <i class="fa-solid ${loc.disabled ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                    </button>
                     <button class="card-action-btn edit" onclick="event.stopPropagation(); editLocation('${loc.id}')" title="Edit">
                         <i class="fa-solid fa-pen"></i>
                     </button>
@@ -349,7 +418,6 @@ function renderItineraryList() {
     });
 }
 
-// Drag and Drop Logic
 function setupDragAndDrop() {
     new Sortable(itineraryList, {
         animation: 150,
@@ -631,11 +699,13 @@ function exportItinerary() {
                 name: loc.name,
                 imageUrl: loc.imageUrl,
                 travelTime: loc.travelTime,
+                travelMode: loc.travelMode,
                 placeToStay: loc.placeToStay,
                 activities: loc.activities,
                 kidsActivity: loc.kidsActivity,
                 foodOptions: loc.foodOptions,
-                funFact: loc.funFact
+                funFact: loc.funFact,
+                disabled: loc.disabled || false // Save disabled state
             }
         }))
     };
@@ -676,11 +746,13 @@ function importItinerary(event) {
                             name: props.name || "Unnamed Location",
                             imageUrl: props.imageUrl || "",
                             travelTime: props.travelTime || "",
+                            travelMode: props.travelMode || "",
                             placeToStay: props.placeToStay || "",
                             activities: props.activities || { morning: "", afternoon: "", allDay: "" },
                             kidsActivity: props.kidsActivity || "",
                             foodOptions: props.foodOptions || "",
-                            funFact: props.funFact || ""
+                            funFact: props.funFact || "",
+                            disabled: props.disabled || false // Load disabled state
                         };
                     });
 

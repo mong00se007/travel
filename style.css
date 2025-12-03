@@ -282,6 +282,25 @@ body {
     border: 1px solid var(--primary-color);
 }
 
+.location-card.disabled {
+    opacity: 0.6;
+    filter: grayscale(100%);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.location-card.disabled:hover {
+    opacity: 0.8;
+}
+
+.card-action-btn.disable {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.card-action-btn.disable:hover {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+}
+
 .card-image {
     height: 100px;
     width: 100%;
