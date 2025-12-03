@@ -11,6 +11,7 @@ let currentTheme = localStorage.getItem('travel_planner_theme') || 'dark';
 // DOM Elements
 const locationModal = document.getElementById('locationModal');
 const locationForm = document.getElementById('locationForm');
+const locationSearch = document.getElementById('locationSearch');
 const itineraryList = document.getElementById('itineraryList');
 const locationCount = document.getElementById('locationCount');
 const resetBtn = document.getElementById('resetBtn');
@@ -500,6 +501,7 @@ function openModal(editId = null) {
         // Add Mode
         document.getElementById('modalTitle').innerText = 'Add Location';
         locationForm.reset();
+        if (locationSearch) locationSearch.value = ''; // Clear search
         document.getElementById('locationId').value = '';
         if (tempClickCoords) {
             document.getElementById('locationLat').value = tempClickCoords.lat;
@@ -624,6 +626,16 @@ function setupEventListeners() {
             travelModeInput.value = btn.dataset.mode;
         });
     });
+
+    // Location Search Listener
+    if (locationSearch) {
+        locationSearch.addEventListener('input', debounce((e) => {
+            const query = e.target.value.trim();
+            if (query.length > 2) {
+                searchLocation(query);
+            }
+        }, 500));
+    }
 }
 
 // Helper Functions
@@ -692,6 +704,51 @@ function getWeatherIcon(code) {
     if ([95, 96, 99].includes(code)) return 'fa-solid fa-bolt';
 
     return 'fa-solid fa-cloud';
+}
+
+// Location Search Functions
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+async function searchLocation(query) {
+    try {
+        // Show loading state (optional, could add a spinner icon change here)
+        const searchIcon = locationSearch.nextElementSibling;
+        if (searchIcon) searchIcon.className = 'fa-solid fa-spinner fa-spin';
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        // Reset icon
+        if (searchIcon) searchIcon.className = 'fa-solid fa-magnifying-glass';
+
+        if (data && data.length > 0) {
+            const result = data[0];
+            document.getElementById('locationLat').value = parseFloat(result.lat).toFixed(4);
+            document.getElementById('locationLng').value = parseFloat(result.lon).toFixed(4);
+
+            // Optional: Update name if empty
+            const nameInput = document.getElementById('locationName');
+            if (!nameInput.value) {
+                // Try to get a good name from the result
+                // display_name is often very long, so maybe just use the query or first part
+                nameInput.value = result.name || query;
+            }
+        }
+    } catch (error) {
+        console.error('Error searching location:', error);
+        const searchIcon = locationSearch.nextElementSibling;
+        if (searchIcon) searchIcon.className = 'fa-solid fa-triangle-exclamation';
+    }
 }
 
 // Export/Import Functions
