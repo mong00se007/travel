@@ -417,6 +417,7 @@ body {
     font-size: 0.85rem;
     color: var(--text-muted);
     margin-bottom: 1rem;
+    padding-left: 0.8rem;
 }
 
 .meta-item {
@@ -437,6 +438,7 @@ body {
     align-items: flex-start;
     font-size: 0.9rem;
     line-height: 1.4;
+    padding-left: 0.8rem;
 }
 
 .detail-row i {
@@ -452,7 +454,7 @@ body {
     border-radius: 8px;
     font-size: 0.85rem;
     font-style: italic;
-    border-left: 3px solid var(--accent-color);
+    border-left: 3px solid #475569;
 }
 
 /* Modal */
