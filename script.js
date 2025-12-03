@@ -393,7 +393,7 @@ function renderItineraryList() {
                     ${activitySummary}
                     ${loc.kidsActivity ? `<div class="detail-row"><i class="fa-solid fa-child-reaching"></i> <span>Kids: ${loc.kidsActivity}</span></div>` : ''}
                     ${loc.foodOptions ? `<div class="detail-row"><i class="fa-solid fa-utensils"></i> <span>Food: ${loc.foodOptions}</span></div>` : ''}
-                    ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb" style="color: #ff0055; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
+                    ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb" style="color: #ffaa00; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
                 </div>
             </div>
         `;
