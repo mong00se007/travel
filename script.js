@@ -710,7 +710,7 @@ function setupEventListeners() {
             if (query.length > 2) {
                 searchLocation(query);
             }
-        }, 500));
+        }, 1500));
     }
 }
 
