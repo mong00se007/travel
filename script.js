@@ -518,6 +518,38 @@ function closeModal() {
     tempClickCoords = null;
 }
 
+// Drag and Drop Logic
+function setupDragAndDrop() {
+    console.log('setupDragAndDrop called');
+    const el = document.getElementById('itineraryList');
+    if (!el) {
+        console.error('itineraryList not found');
+        return;
+    }
+
+    if (typeof Sortable !== 'undefined') {
+        console.log('SortableJS found, creating instance');
+        Sortable.create(el, {
+            animation: 150,
+            onEnd: function (evt) {
+                console.log('Drag ended', evt);
+                const newIndex = evt.newIndex;
+                const oldIndex = evt.oldIndex;
+
+                // Update State
+                const movedItem = locations.splice(oldIndex, 1)[0];
+                locations.splice(newIndex, 0, movedItem);
+
+                // Re-render to update numbers and map
+                renderApp();
+                saveData();
+            }
+        });
+    } else {
+        console.warn('SortableJS not loaded');
+    }
+}
+
 // Event Listeners
 function setupEventListeners() {
     // Modal Close Buttons
