@@ -531,6 +531,10 @@ function setupDragAndDrop() {
         console.log('SortableJS found, creating instance');
         Sortable.create(el, {
             animation: 150,
+            delay: 150, // Add delay to prevent accidental drags
+            delayOnTouchOnly: true, // Only delay on touch devices
+            filter: '.card-action-btn', // Prevent dragging from buttons
+            preventOnFilter: false, // Allow clicks on filtered elements
             onEnd: function (evt) {
                 console.log('Drag ended', evt);
                 const newIndex = evt.newIndex;

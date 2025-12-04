@@ -874,6 +874,8 @@ textarea:focus {
         flex: none !important;
     }
 }
+
+
 /* Mobile Button Fixes */
 @media (max-width: 900px) {
     .card-action-btn {
@@ -884,5 +886,9 @@ textarea:focus {
 
     .card-header-overlay {
         right: 140px;
+    }
+
+    .card-actions {
+        opacity: 1 !important;
     }
 }
