@@ -838,26 +838,430 @@ textarea:focus {
     }
 
     /* Make action buttons always visible on mobile */
-    .card-actions {
-        opacity: 1 !important;
-    }
-}
-
-/* Mobile Landscape Mode */
-@media (max-width: 900px) and (orientation: landscape) {
-    .map-section {
-        height: 50vh;
-        /* Reduce map height in landscape */
-        min-height: 200px;
+    ```css .info-content strong {
+        font-weight: 600;
+        color: var(--primary-color);
     }
 
-    .itinerary-section {
-        height: auto;
-        overflow: visible;
+    .info-content a {
+        color: #60d5ff;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-weight: normal;
     }
 
-    body {
-        overflow-y: auto;
-        /* Ensure body scrolls */
+    .info-content a:hover {
+        color: var(--primary-color);
+        text-decoration: underline;
     }
-}
+
+    /* Responsive */
+    @media (max-width: 900px) {
+
+        /* Keep app wrapper fixed height to enable internal scrolling */
+        .app-wrapper {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-content {
+            flex-direction: column;
+            min-height: 0;
+            /* Crucial for nested flex scrolling */
+        }
+
+        .map-section {
+            height: 40vh;
+            /* Use vh instead of fixed px for better scaling */
+            min-height: 300px;
+            flex: none;
+        }
+
+        .itinerary-section {
+            min-width: 0;
+            flex: 1;
+            /* Take remaining space */
+            min-height: 0;
+            /* Crucial for nested flex scrolling */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .itinerary-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* Fix card expansion on mobile */
+        .location-card.expanded {
+            height: auto !important;
+            max-height: none !important;
+        }
+
+        .card-content {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        /* Make action buttons always visible on mobile */
+        .card-actions {
+            opacity: 1 !important;
+        }
+    }
+
+    /* Travel Mode Selector */
+    .travel-mode-selector {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .travel-mode-btn {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        position: relative;
+    }
+
+    .travel-mode-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: var(--text-main);
+        transform: translateY(-3px);
+        border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .travel-mode-btn.active {
+        background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+        color: white;
+        border-color: var(--primary-color);
+        box-shadow: 0 8px 25px rgba(0, 210, 255, 0.6), 0 0 0 3px rgba(0, 210, 255, 0.2);
+        transform: scale(1.1);
+    }
+
+    .travel-mode-btn.active i {
+        transform: scale(1.2);
+        animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            transform: scale(1.2);
+        }
+
+        50% {
+            transform: scale(1.3);
+        }
+    }
+
+    /* Mobile Improvements */
+    @media (max-width: 600px) {
+
+        /* Enable full page scrolling on mobile */
+        body {
+            height: auto;
+            overflow: auto;
+        }
+
+        .app-wrapper {
+            height: auto;
+            min-height: 100vh;
+        }
+
+        .main-header {
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 0.75rem;
+        }
+
+        .header-controls {
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+
+        /* Make buttons more compact on mobile */
+        .btn {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.8rem;
+            gap: 0.3rem;
+        }
+
+        .main-content {
+            flex-direction: column;
+        }
+
+        /* Map section - fixed height */
+        .map-section {
+            height: 40vh;
+            min-height: 300px;
+            flex: none;
+        }
+
+        /* Itinerary section - auto height for page scrolling */
+        .itinerary-section {
+            min-width: 0;
+            height: auto;
+            flex: none;
+        }
+
+        .itinerary-list {
+            overflow-y: visible;
+        }
+
+        /* Fix card expansion on mobile */
+        .location-card.expanded {
+            height: auto !important;
+            max-height: none !important;
+        }
+
+        .card-content {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        .info-content strong {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .info-content a {
+            color: #60d5ff;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-weight: normal;
+        }
+
+        .info-content a:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+
+            /* Keep app wrapper fixed height to enable internal scrolling */
+            .app-wrapper {
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            .main-content {
+                flex-direction: column;
+                min-height: 0;
+                /* Crucial for nested flex scrolling */
+            }
+
+            .map-section {
+                height: 40vh;
+                /* Use vh instead of fixed px for better scaling */
+                min-height: 300px;
+                flex: none;
+            }
+
+            .itinerary-section {
+                min-width: 0;
+                flex: 1;
+                /* Take remaining space */
+                min-height: 0;
+                /* Crucial for nested flex scrolling */
+                display: flex;
+                flex-direction: column;
+            }
+
+            .itinerary-list {
+                flex: 1;
+                overflow-y: auto;
+            }
+
+            /* Fix card expansion on mobile */
+            .location-card.expanded {
+                height: auto !important;
+                max-height: none !important;
+            }
+
+            .card-content {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            /* Make action buttons always visible on mobile */
+            .card-actions {
+                opacity: 1 !important;
+            }
+        }
+
+        /* Travel Mode Selector */
+        .travel-mode-selector {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .travel-mode-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            position: relative;
+        }
+
+        .travel-mode-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .travel-mode-btn.active {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 8px 25px rgba(0, 210, 255, 0.6), 0 0 0 3px rgba(0, 210, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .travel-mode-btn.active i {
+            transform: scale(1.2);
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1.2);
+            }
+
+            50% {
+                transform: scale(1.3);
+            }
+        }
+
+        /* Mobile Improvements */
+        @media (max-width: 600px) {
+
+            /* Enable full page scrolling on mobile */
+            body {
+                height: auto;
+                overflow: auto;
+            }
+
+            .app-wrapper {
+                height: auto;
+                min-height: 100vh;
+            }
+
+            .main-header {
+                flex-direction: column;
+                gap: 0.75rem;
+                padding: 0.75rem;
+            }
+
+            .header-controls {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 0.3rem;
+            }
+
+            /* Make buttons more compact on mobile */
+            .btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.8rem;
+                gap: 0.3rem;
+            }
+
+            .main-content {
+                flex-direction: column;
+            }
+
+            /* Map section - fixed height */
+            .map-section {
+                height: 40vh;
+                min-height: 300px;
+                flex: none;
+            }
+
+            /* Itinerary section - auto height for page scrolling */
+            .itinerary-section {
+                min-width: 0;
+                height: auto;
+                flex: none;
+            }
+
+            .itinerary-list {
+                overflow-y: visible;
+            }
+
+            /* Fix card expansion on mobile */
+            .location-card.expanded {
+                height: auto !important;
+                max-height: none !important;
+            }
+
+            .card-content {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            /* Make action buttons always visible on mobile */
+            .card-actions {
+                opacity: 1 !important;
+            }
+        }
+
+        /* Mobile Landscape Mode */
+        @media (max-width: 900px) and (orientation: landscape) {
+            body {
+                height: auto;
+                overflow-y: auto;
+            }
+
+            .app-wrapper {
+                height: auto;
+                min-height: 100vh;
+                overflow: visible;
+            }
+
+            .main-content {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .map-section {
+                height: 60vh;
+                /* Give map decent space */
+                min-height: 300px;
+                flex: none;
+            }
+
+            .itinerary-section {
+                height: auto;
+                overflow: visible;
+                flex: none;
+            }
+
+            .itinerary-list {
+                overflow-y: visible;
+            }
+        }
