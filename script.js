@@ -1,3 +1,4 @@
+console.log('SCRIPT LOADED: script.js');
 // State Management
 let locations = JSON.parse(localStorage.getItem('travel_planner_locations')) || [];
 let map;
@@ -8,18 +9,32 @@ let polyline;
 let tempClickCoords = null;
 let currentTheme = localStorage.getItem('travel_planner_theme') || 'dark';
 
-// DOM Elements
-const locationModal = document.getElementById('locationModal');
-const locationForm = document.getElementById('locationForm');
-const locationSearch = document.getElementById('locationSearch');
-const itineraryList = document.getElementById('itineraryList');
-const locationCount = document.getElementById('locationCount');
-const resetBtn = document.getElementById('resetBtn');
-const themeToggleBtn = document.getElementById('themeToggle');
-// Save button removed - app auto-saves to localStorage
+// DOM Elements (Initialized in DOMContentLoaded)
+let locationModal;
+let locationForm;
+let locationSearch;
+let itineraryList;
+let locationCount;
+let exportBtn;
+let resetBtn;
+let fullscreenBtn;
+let themeToggleBtn;
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('App Initializing...');
+
+    // Initialize DOM Elements
+    locationModal = document.getElementById('locationModal');
+    locationForm = document.getElementById('locationForm');
+    locationSearch = document.getElementById('locationSearch');
+    itineraryList = document.getElementById('itineraryList');
+    locationCount = document.getElementById('locationCount');
+    exportBtn = document.getElementById('exportBtn');
+    resetBtn = document.getElementById('resetBtn');
+    fullscreenBtn = document.getElementById('fullscreenBtn');
+    themeToggleBtn = document.getElementById('themeToggle');
+
     initMap();
     renderApp();
     setupEventListeners();
@@ -418,36 +433,24 @@ function renderItineraryList() {
 
             // Center map on this location
             map.setView([loc.lat, loc.lng], 10, {
-                animate: true,
-                duration: 0.5
+                delayOnTouchOnly: true,
+                onEnd: function (evt) {
+                    const itemEl = evt.item;
+                    const newIndex = evt.newIndex;
+                    const oldIndex = evt.oldIndex;
+
+                    // Update State
+                    const movedItem = locations.splice(oldIndex, 1)[0];
+                    locations.splice(newIndex, 0, movedItem);
+
+                    // Re-render to update numbers and map
+                    renderApp();
+                    saveData();
+                }
             });
         });
 
         itineraryList.appendChild(card);
-    });
-}
-
-function setupDragAndDrop() {
-    new Sortable(itineraryList, {
-        animation: 150,
-        ghostClass: 'sortable-ghost',
-        dragClass: 'sortable-drag',
-        handle: '.location-card', // Make whole card draggable
-        delay: 200, // Delay for touch devices to allow scrolling/tapping
-        delayOnTouchOnly: true,
-        onEnd: function (evt) {
-            const itemEl = evt.item;
-            const newIndex = evt.newIndex;
-            const oldIndex = evt.oldIndex;
-
-            // Update State
-            const movedItem = locations.splice(oldIndex, 1)[0];
-            locations.splice(newIndex, 0, movedItem);
-
-            // Re-render to update numbers and map
-            renderApp();
-            saveData();
-        }
     });
 }
 
@@ -590,15 +593,56 @@ function setupEventListeners() {
     }
 
     // Theme Toggle Button
-    themeToggleBtn.addEventListener('click', toggleTheme);
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+
+    // Fullscreen Button
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Fullscreen error: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        });
+
+        // Update icon when fullscreen state changes
+        document.addEventListener('fullscreenchange', () => {
+            const icon = fullscreenBtn.querySelector('i');
+            if (document.fullscreenElement) {
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                fullscreenBtn.title = "Exit Full Screen";
+            } else {
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                fullscreenBtn.title = "Toggle Full Screen";
+            }
+        });
+    }
 
     // Export Button
-    document.getElementById('exportBtn').addEventListener('click', exportItinerary);
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportItinerary);
+    } else {
+        const dynamicExportBtn = document.getElementById('exportBtn');
+        if (dynamicExportBtn) dynamicExportBtn.addEventListener('click', exportItinerary);
+    }
 
     // Import Button
     const fileInput = document.getElementById('importFile');
-    document.getElementById('importBtn').addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', importItinerary);
+    if (fileInput) {
+        const importBtn = document.getElementById('importBtn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => fileInput.click());
+        }
+        fileInput.addEventListener('change', importItinerary);
+    }
 
     // Event Delegation for Edit/Delete buttons in Itinerary List
     itineraryList.addEventListener('click', (e) => {

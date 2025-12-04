@@ -33,22 +33,25 @@
                 <h1>Travel Planner</h1>
             </div>
             <div class="header-controls">
+                <button id="fullscreenBtn" class="btn btn-secondary" title="Toggle Full Screen">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+                <button id="resetBtn" class="btn btn-secondary" title="Reset Itinerary">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
                 <button id="themeToggle" class="btn btn-secondary" title="Toggle Dark/Light Mode">
                     <i class="fa-solid fa-moon"></i>
                 </button>
                 <button id="infoBtn" class="btn btn-secondary" title="About">
                     <i class="fa-solid fa-info-circle"></i>
                 </button>
+                <button id="exportBtn" class="btn btn-secondary" title="Export Itinerary">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+                <button id="importBtn" class="btn btn-secondary" title="Import Itinerary">
+                    <i class="fa-solid fa-upload"></i>
+                </button>
                 <input type="file" id="importFile" accept=".geojson, .json" style="display: none;">
-                <button id="importBtn" class="btn btn-secondary" title="Import from File">
-                    <i class="fa-solid fa-file-import"></i> Import
-                </button>
-                <button id="exportBtn" class="btn btn-secondary" title="Export to File">
-                    <i class="fa-solid fa-file-export"></i> Export
-                </button>
-                <button id="resetBtn" class="btn btn-secondary" title="Reset Itinerary">
-                    <i class="fa-solid fa-rotate-right"></i> Reset
-                </button>
             </div>
         </header>
 
@@ -111,8 +114,6 @@
                             <input type="number" id="locationLng" step="any" required placeholder="e.g., 2.3522">
                         </div>
                     </div>
-
-
 
                     <div class="form-group">
                         <label for="locationName">Location Name</label>
