@@ -375,7 +375,7 @@ body {
     right: 10px;
     display: flex;
     gap: 0.5rem;
-    z-index: 2;
+    z-index: 10;
     opacity: 0;
     transition: opacity 0.2s ease;
 }
@@ -872,5 +872,17 @@ textarea:focus {
     .itinerary-list {
         overflow-y: visible !important;
         flex: none !important;
+    }
+}
+/* Mobile Button Fixes */
+@media (max-width: 900px) {
+    .card-action-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+
+    .card-header-overlay {
+        right: 140px;
     }
 }
