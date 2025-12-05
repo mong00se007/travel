@@ -892,3 +892,175 @@ textarea:focus {
         opacity: 1 !important;
     }
 }
+
+/* Print Styles */
+@media print {
+    body {
+        background: white;
+        color: black;
+        height: auto;
+        overflow: visible;
+    }
+
+    .app-wrapper {
+        display: block;
+        height: auto;
+        padding: 0;
+        max-width: none;
+    }
+
+    .main-header,
+    .map-section,
+    .travel-mode-selector,
+    .card-actions,
+    .modal,
+    .add-location-btn {
+        display: none !important;
+    }
+
+    .itinerary-section {
+        border: none;
+        background: none;
+        box-shadow: none;
+        width: 100%;
+    }
+
+    .itinerary-header {
+        border-bottom: 2px solid #000;
+        padding: 1rem 0;
+        margin-bottom: 2rem;
+    }
+
+    .itinerary-header h2 {
+        color: black;
+        font-size: 24pt;
+    }
+
+    .badge {
+        display: none;
+    }
+
+    .itinerary-list {
+        overflow: visible;
+        display: block;
+        padding: 0;
+    }
+
+    .location-card {
+        break-inside: avoid;
+        background: none;
+        border: none;
+        border-bottom: 1px solid #ccc;
+        border-radius: 0;
+        margin-bottom: 2rem;
+        height: auto !important;
+        min-height: 0;
+        box-shadow: none;
+        padding-bottom: 1rem;
+        display: block;
+    }
+
+    .location-card.expanded {
+        height: auto !important;
+        max-height: none !important;
+    }
+
+    /* Reset Image Container to show header */
+    .card-image {
+        height: auto;
+        background: none !important;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-image::after {
+        display: none;
+    }
+
+    .card-header-overlay {
+        position: static;
+        color: black;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .card-header-overlay .card-title {
+        color: black;
+        text-shadow: none;
+        font-size: 18pt;
+        font-weight: bold;
+        white-space: normal;
+        overflow: visible;
+    }
+
+    .card-number {
+        background: #000 !important;
+        color: white !important;
+        width: 30px;
+        height: 30px;
+        font-size: 12pt;
+        box-shadow: none;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .card-weather {
+        display: none;
+    }
+
+    .card-content {
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0;
+    }
+
+    .card-meta {
+        color: #666;
+        padding-left: 0;
+        margin-bottom: 1rem;
+        font-size: 10pt;
+        display: flex;
+        gap: 1.5rem;
+    }
+
+    .meta-item i {
+        display: none;
+    }
+
+    .card-details {
+        display: block;
+        padding-left: 0;
+    }
+
+    .detail-row {
+        color: #000;
+        padding-left: 0;
+        margin-bottom: 0.3rem;
+        font-size: 11pt;
+    }
+
+    .detail-row i {
+        display: none;
+    }
+
+    .detail-row strong {
+        font-weight: 600;
+        margin-right: 0.5rem;
+    }
+
+    .fun-fact {
+        background: #f5f5f5;
+        color: #333;
+        border-left: 3px solid #000;
+        margin-top: 1rem;
+        padding: 0.8rem;
+        font-style: italic;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .fun-fact i {
+        display: none;
+    }
+}

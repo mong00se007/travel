@@ -663,21 +663,15 @@ function setupEventListeners() {
     }
 
     // Export Button
+    if (printBtn) {
+        printBtn.addEventListener('click', () => window.print());
+    }
+
     if (exportBtn) {
         exportBtn.addEventListener('click', exportItinerary);
     } else {
         const dynamicExportBtn = document.getElementById('exportBtn');
         if (dynamicExportBtn) dynamicExportBtn.addEventListener('click', exportItinerary);
-    }
-
-    // Import Button
-    const fileInput = document.getElementById('importFile');
-    if (fileInput) {
-        const importBtn = document.getElementById('importBtn');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => fileInput.click());
-        }
-        fileInput.addEventListener('change', importItinerary);
     }
 
     // Event Delegation for Edit/Delete buttons in Itinerary List
@@ -833,41 +827,65 @@ async function searchLocation(query) {
 
 // Export/Import Functions
 function exportItinerary() {
-    const geoJSON = {
-        type: "FeatureCollection",
-        features: locations.map(loc => ({
-            type: "Feature",
-            geometry: {
-                type: "Point",
-                coordinates: [loc.lng, loc.lat]
-            },
-            properties: {
-                id: loc.id,
-                name: loc.name,
-                imageUrl: loc.imageUrl,
-                travelTime: loc.travelTime,
-                travelMode: loc.travelMode,
-                placeToStay: loc.placeToStay,
-                activities: loc.activities,
-                kidsActivity: loc.kidsActivity,
-                foodOptions: loc.foodOptions,
-                funFact: loc.funFact,
-                disabled: loc.disabled || false // Save disabled state
-            }
-        }))
-    };
+    // Create KML XML structure
+    let kml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    kml += '<kml xmlns="http://www.opengis.net/kml/2.2">\n';
+    kml += '  <Document>\n';
+    kml += '    <name>Travel Planner Itinerary</name>\n';
+    kml += '    <description>Exported from Travel Planner</description>\n';
 
-    const dataStr = JSON.stringify(geoJSON, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/geo+json' });
+    locations.forEach((loc, index) => {
+        kml += '    <Placemark>\n';
+        kml += `      <name>${escapeXml(loc.name)}</name>\n`;
+        kml += `      <description>${escapeXml(loc.funFact || 'No description')}</description>\n`;
+        kml += '      <Point>\n';
+        kml += `        <coordinates>${loc.lng},${loc.lat},0</coordinates>\n`;
+        kml += '      </Point>\n';
+        kml += '      <ExtendedData>\n';
+        kml += `        <Data name="id"><value>${escapeXml(loc.id)}</value></Data>\n`;
+        kml += `        <Data name="imageUrl"><value>${escapeXml(loc.imageUrl || '')}</value></Data>\n`;
+        kml += `        <Data name="travelTime"><value>${escapeXml(loc.travelTime || '')}</value></Data>\n`;
+        kml += `        <Data name="travelMode"><value>${escapeXml(loc.travelMode || '')}</value></Data>\n`;
+        kml += `        <Data name="placeToStay"><value>${escapeXml(loc.placeToStay || '')}</value></Data>\n`;
+        kml += `        <Data name="morningActivity"><value>${escapeXml(loc.activities?.morning || '')}</value></Data>\n`;
+        kml += `        <Data name="afternoonActivity"><value>${escapeXml(loc.activities?.afternoon || '')}</value></Data>\n`;
+        kml += `        <Data name="allDayActivity"><value>${escapeXml(loc.activities?.allDay || '')}</value></Data>\n`;
+        kml += `        <Data name="kidsActivity"><value>${escapeXml(loc.kidsActivity || '')}</value></Data>\n`;
+        kml += `        <Data name="foodOptions"><value>${escapeXml(loc.foodOptions || '')}</value></Data>\n`;
+        kml += `        <Data name="funFact"><value>${escapeXml(loc.funFact || '')}</value></Data>\n`;
+        kml += `        <Data name="disabled"><value>${loc.disabled || false}</value></Data>\n`;
+        kml += '      </ExtendedData>\n';
+        kml += '    </Placemark>\n';
+    });
+
+    kml += '  </Document>\n';
+    kml += '</kml>';
+
+    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'travel_planner_itinerary.geojson';
+    a.download = 'travel_planner_itinerary.kml';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+// Helper function to escape XML special characters
+function escapeXml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+            default: return c;
+        }
+    });
 }
 
 function importItinerary(event) {
@@ -877,50 +895,70 @@ function importItinerary(event) {
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
-            const importedData = JSON.parse(e.target.result);
+            const kmlText = e.target.result;
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
 
-            // Check if it's a valid GeoJSON FeatureCollection
-            if (importedData.type === "FeatureCollection" && Array.isArray(importedData.features)) {
-                if (confirm('Importing will replace your current itinerary. Continue?')) {
-                    locations = importedData.features.map(feature => {
-                        const props = feature.properties;
-                        const coords = feature.geometry.coordinates; // [lng, lat]
+            // Check for parsing errors
+            const parserError = xmlDoc.querySelector('parsererror');
+            if (parserError) {
+                throw new Error('Invalid XML format');
+            }
 
-                        return {
-                            id: props.id || Date.now().toString() + Math.random(),
-                            lat: coords[1],
-                            lng: coords[0],
-                            name: props.name || "Unnamed Location",
-                            imageUrl: props.imageUrl || "",
-                            travelTime: props.travelTime || "",
-                            travelMode: props.travelMode || "",
-                            placeToStay: props.placeToStay || "",
-                            activities: props.activities || { morning: "", afternoon: "", allDay: "" },
-                            kidsActivity: props.kidsActivity || "",
-                            foodOptions: props.foodOptions || "",
-                            funFact: props.funFact || "",
-                            disabled: props.disabled || false // Load disabled state
-                        };
-                    });
+            // Get all Placemark elements
+            const placemarks = xmlDoc.querySelectorAll('Placemark');
 
-                    renderApp();
-                    saveData();
-                    alert('Itinerary imported successfully from GeoJSON!');
-                }
-            } else if (Array.isArray(importedData)) {
-                // Backward compatibility for old JSON array format
-                if (confirm('Legacy format detected. Importing will replace your current itinerary. Continue?')) {
-                    locations = importedData;
-                    renderApp();
-                    saveData();
-                    alert('Itinerary imported successfully!');
-                }
-            } else {
-                alert('Invalid file format: Must be a GeoJSON FeatureCollection or a valid JSON array.');
+            if (placemarks.length === 0) {
+                alert('No locations found in KML file.');
+                event.target.value = '';
+                return;
+            }
+
+            if (confirm('Importing will replace your current itinerary. Continue?')) {
+                locations = Array.from(placemarks).map(placemark => {
+                    // Extract coordinates
+                    const coordsText = placemark.querySelector('coordinates')?.textContent.trim();
+                    const coords = coordsText ? coordsText.split(',') : [0, 0, 0];
+                    const lng = parseFloat(coords[0]) || 0;
+                    const lat = parseFloat(coords[1]) || 0;
+
+                    // Extract name
+                    const name = placemark.querySelector('name')?.textContent || 'Unnamed Location';
+
+                    // Extract extended data
+                    const getData = (name) => {
+                        const dataEl = placemark.querySelector(`Data[name="${name}"] value`);
+                        return dataEl?.textContent || '';
+                    };
+
+                    return {
+                        id: getData('id') || Date.now().toString() + Math.random(),
+                        lat: lat,
+                        lng: lng,
+                        name: name,
+                        imageUrl: getData('imageUrl'),
+                        travelTime: getData('travelTime'),
+                        travelMode: getData('travelMode'),
+                        placeToStay: getData('placeToStay'),
+                        activities: {
+                            morning: getData('morningActivity'),
+                            afternoon: getData('afternoonActivity'),
+                            allDay: getData('allDayActivity')
+                        },
+                        kidsActivity: getData('kidsActivity'),
+                        foodOptions: getData('foodOptions'),
+                        funFact: getData('funFact'),
+                        disabled: getData('disabled') === 'true'
+                    };
+                });
+
+                renderApp();
+                saveData();
+                alert('Itinerary imported successfully from KML!');
             }
         } catch (error) {
             console.error('Import Error:', error);
-            alert('Error importing file. Please make sure it is a valid JSON/GeoJSON file.');
+            alert('Error importing file. Please make sure it is a valid KML file.');
         }
         // Reset input
         event.target.value = '';
