@@ -23,6 +23,62 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Inline styles for date/time pickers -->
+    <style>
+        /* Date and Time Picker Styling - make icons visible */
+        input[type="date"],
+        input[type="time"] {
+            cursor: pointer;
+            color-scheme: dark;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            filter: invert(1);
+            padding: 4px;
+            opacity: 0.7;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        input[type="time"]::-webkit-calendar-picker-indicator:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            opacity: 1;
+        }
+
+        .light-mode input[type="date"],
+        .light-mode input[type="time"] {
+            color-scheme: light;
+        }
+
+        .light-mode input[type="date"]::-webkit-calendar-picker-indicator,
+        .light-mode input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: none;
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .light-mode input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        .light-mode input[type="time"]::-webkit-calendar-picker-indicator:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Nights Display - simple text, not a badge */
+        .nights-display {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--primary-color);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .nights-display i {
+            color: #9b59b6;
+        }
+    </style>
 </head>
 
 <body>
@@ -98,71 +154,149 @@
                 <form id="locationForm">
                     <input type="hidden" id="locationId">
 
-                    <div class="form-group">
-                        <label for="locationSearch">Search Location (Auto-fill)</label>
-                        <div style="position: relative;">
-                            <input type="text" id="locationSearch" placeholder="Type a city or place name...">
-                            <i class="fa-solid fa-magnifying-glass"
-                                style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                    <!-- Main Tabs Navigation -->
+                    <div class="main-tabs">
+                        <div class="main-tab active" data-tab="location" title="Location Details">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </div>
+                        <div class="main-tab" data-tab="stay" title="Place to Stay">
+                            <i class="fa-solid fa-bed"></i>
+                        </div>
+                        <div class="main-tab" data-tab="activities" title="Activities">
+                            <i class="fa-solid fa-binoculars"></i>
+                        </div>
+                        <div class="main-tab" data-tab="food" title="Food Options">
+                            <i class="fa-solid fa-utensils"></i>
+                        </div>
+                        <div class="main-tab" data-tab="phrases" title="Phrases & Fun Fact">
+                            <i class="fa-regular fa-comment"></i>
                         </div>
                     </div>
 
-                    <div class="form-row">
+                    <!-- Tab 1: Location Details -->
+                    <div class="main-tab-content active" id="tab-location">
                         <div class="form-group">
-                            <label for="locationLat">Latitude</label>
-                            <input type="number" id="locationLat" step="any" required placeholder="e.g., 48.8566">
+                            <label for="locationSearch">Search Location (Auto-fill)</label>
+                            <div style="position: relative;">
+                                <input type="text" id="locationSearch" placeholder="Type a city or place name...">
+                                <i class="fa-solid fa-magnifying-glass"
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                            </div>
                         </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="locationLat">Latitude</label>
+                                <input type="number" id="locationLat" step="any" required placeholder="e.g., 48.8566">
+                            </div>
+                            <div class="form-group">
+                                <label for="locationLng">Longitude</label>
+                                <input type="number" id="locationLng" step="any" required placeholder="e.g., 2.3522">
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label for="locationLng">Longitude</label>
-                            <input type="number" id="locationLng" step="any" required placeholder="e.g., 2.3522">
+                            <label for="locationName">Location Name</label>
+                            <input type="text" id="locationName" required placeholder="e.g., Eiffel Tower">
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label for="locationName">Location Name</label>
-                        <input type="text" id="locationName" required placeholder="e.g., Eiffel Tower">
-                    </div>
+                        <div class="form-group">
+                            <label for="imageUrl">Image URL (Background)</label>
+                            <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="imageUrl">Image URL (Background)</label>
-                        <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg">
-                    </div>
-
-                    <div class="form-row">
                         <div class="form-group">
                             <label for="travelTime">Travel Time (from previous)</label>
                             <input type="text" id="travelTime" placeholder="e.g., 2h 30m (leave blank for estimate)">
                         </div>
+
                         <div class="form-group">
-                            <label for="placeToStay">Place to Stay</label>
-                            <input type="text" id="placeToStay" placeholder="e.g., Hotel Ritz">
+                            <label for="travelMode">Travel Mode</label>
+                            <input type="hidden" id="travelMode">
+                            <div class="travel-mode-selector">
+                                <button type="button" class="travel-mode-btn" data-mode="walking" title="Walking">
+                                    <i class="fa-solid fa-person-walking"></i>
+                                </button>
+                                <button type="button" class="travel-mode-btn" data-mode="biking" title="Biking">
+                                    <i class="fa-solid fa-person-biking"></i>
+                                </button>
+                                <button type="button" class="travel-mode-btn" data-mode="car" title="Car">
+                                    <i class="fa-solid fa-car"></i>
+                                </button>
+                                <button type="button" class="travel-mode-btn" data-mode="train" title="Train">
+                                    <i class="fa-solid fa-train"></i>
+                                </button>
+                                <button type="button" class="travel-mode-btn" data-mode="boat" title="Boat">
+                                    <i class="fa-solid fa-sailboat"></i>
+                                </button>
+                                <button type="button" class="travel-mode-btn" data-mode="plane" title="Plane">
+                                    <i class="fa-solid fa-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="ticketNumber">Ticket/Booking Number</label>
+                                <input type="text" id="ticketNumber" placeholder="e.g., ABC123">
+                            </div>
+                            <div class="form-group" style="flex: 0 0 140px;">
+                                <label for="departureTime">Departure Time</label>
+                                <input type="time" id="departureTime">
+                            </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="travelMode">Travel Mode</label>
-                        <input type="hidden" id="travelMode">
-                        <div class="travel-mode-selector">
-                            <button type="button" class="travel-mode-btn" data-mode="walking" title="Walking">
-                                <i class="fa-solid fa-person-walking"></i>
-                            </button>
-                            <button type="button" class="travel-mode-btn" data-mode="biking" title="Biking">
-                                <i class="fa-solid fa-person-biking"></i>
-                            </button>
-                            <button type="button" class="travel-mode-btn" data-mode="car" title="Car">
-                                <i class="fa-solid fa-car"></i>
-                            </button>
-                            <button type="button" class="travel-mode-btn" data-mode="boat" title="Boat">
-                                <i class="fa-solid fa-sailboat"></i>
-                            </button>
-                            <button type="button" class="travel-mode-btn" data-mode="plane" title="Plane">
-                                <i class="fa-solid fa-plane"></i>
-                            </button>
+                    <!-- Tab 2: Place to Stay -->
+                    <div class="main-tab-content" id="tab-stay">
+                        <div class="form-group">
+                            <label for="placeToStay">Accommodation Name</label>
+                            <input type="text" id="placeToStay" placeholder="e.g., The Grand Hotel">
+                        </div>
+                        <div class="form-group">
+                            <label for="stayAddress">Address (Search to get coordinates)</label>
+                            <div style="position: relative;">
+                                <input type="text" id="stayAddress" placeholder="Type address and wait...">
+                                <i class="fa-solid fa-magnifying-glass"
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #64748b;"></i>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="stayLat">Latitude</label>
+                                <input type="number" id="stayLat" step="any" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="stayLng">Longitude</label>
+                                <input type="number" id="stayLng" step="any" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="stayDateFrom">Check-in Date</label>
+                                <input type="date" id="stayDateFrom">
+                            </div>
+                            <div class="form-group">
+                                <label for="stayDateTo">Check-out Date</label>
+                                <input type="date" id="stayDateTo">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 0 0 130px;">
+                                <label for="checkoutTime">Check-out Time</label>
+                                <input type="time" id="checkoutTime">
+                            </div>
+                            <div class="form-group"
+                                style="flex: 1; display: flex; align-items: flex-end; padding-bottom: 0.4rem;">
+                                <div id="stayNightsDisplay" class="nights-display" style="display: none;">
+                                    <i class="fa-solid fa-moon"></i>
+                                    <span id="stayNightsCount">0</span> nights
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Activities</label>
+                    <!-- Tab 3: Activities -->
+                    <div class="main-tab-content" id="tab-activities">
                         <div class="tabs">
                             <div class="tab active" data-tab="morning">Morning</div>
                             <div class="tab" data-tab="afternoon">Afternoon</div>
@@ -180,21 +314,40 @@
                             <textarea id="allDayActivity" rows="3"
                                 placeholder="Is this a full day activity?"></textarea>
                         </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label for="kidsActivity">For the Kids</label>
+                            <input type="text" id="kidsActivity" placeholder="Fun stuff for children...">
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="kidsActivity">For the Kids</label>
-                        <input type="text" id="kidsActivity" placeholder="Fun stuff for children...">
+                    <!-- Tab 4: Food Options -->
+                    <div class="main-tab-content" id="tab-food">
+                        <div class="form-group">
+                            <label for="foodBreakfast">Breakfast</label>
+                            <textarea id="foodBreakfast" rows="2" placeholder="Breakfast spots..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="foodLunch">Lunch</label>
+                            <textarea id="foodLunch" rows="2" placeholder="Lunch spots..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="foodDinner">Dinner</label>
+                            <textarea id="foodDinner" rows="2" placeholder="Dinner spots..."></textarea>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="foodOptions">Food Options</label>
-                        <input type="text" id="foodOptions" placeholder="Restaurants, cafes, street food...">
-                    </div>
+                    <!-- Tab 5: Phrases & Fun Fact -->
+                    <div class="main-tab-content" id="tab-phrases">
+                        <div class="form-group">
+                            <label for="funFact">Fun Fact</label>
+                            <textarea id="funFact" rows="3" placeholder="Did you know..."></textarea>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="funFact">Fun Fact</label>
-                        <textarea id="funFact" rows="2" placeholder="Did you know..."></textarea>
+                        <div class="form-group">
+                            <label for="phrases">Phrases</label>
+                            <textarea id="phrases" rows="3" placeholder="Useful phrases..."></textarea>
+                        </div>
                     </div>
 
                     <div class="form-actions">

@@ -129,6 +129,7 @@ function estimateTravelTime(distance, mode) {
         'walking': 5,
         'biking': 15,
         'car': 40,  // Reduced from 60 to add ~50% more time for realistic estimates
+        'train': 80,
         'boat': 30,
         'plane': 500
     };
@@ -226,6 +227,47 @@ function renderMapElements() {
             `);
 
         markers.push(marker);
+
+        // Add bed marker for accommodation if coordinates exist
+        if (loc.stayLat && loc.stayLng && !loc.disabled) {
+            const bedIcon = L.divIcon({
+                className: 'custom-map-marker',
+                html: `<div style="
+                    background-color: #9b59b6;
+                    width: 26px;
+                    height: 26px;
+                    border-radius: 50%;
+                    border: 2px solid white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+                "><i class="fa-solid fa-bed" style="font-size: 12px;"></i></div>`,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            });
+
+            const bedMarker = L.marker([loc.stayLat, loc.stayLng], {
+                icon: bedIcon,
+                zIndexOffset: 800
+            })
+                .addTo(map)
+                .bindPopup(`
+                    <div style="font-family: 'Outfit', sans-serif; color: #0f172a; min-width: 180px;">
+                        <h3 style="margin: 0 0 5px 0; color: #9b59b6; text-align: center;"><i class="fa-solid fa-bed"></i> Stay</h3>
+                        <p style="margin: 5px 0; text-align: center;"><strong>${loc.placeToStay || 'Accommodation'}</strong></p>
+                        ${loc.stayAddress ? `<p style="margin: 5px 0; font-size: 0.9em; color: #666; text-align: center;">${loc.stayAddress}</p>` : ''}
+                        ${loc.stayDateFrom && loc.stayDateTo ? `<p style="margin: 8px 0 0 0; padding-top: 8px; border-top: 1px solid #ddd; text-align: center; font-size: 0.85em;">
+                            <i class="fa-solid fa-moon" style="color: #9b59b6;"></i> 
+                            <strong>${Math.round((new Date(loc.stayDateTo) - new Date(loc.stayDateFrom)) / (1000 * 60 * 60 * 24))} nights</strong>
+                            ${loc.checkoutTime ? `<br><i class="fa-solid fa-clock" style="color: #888;"></i> Check-out: ${loc.checkoutTime}` : ''}
+                        </p>` : ''}
+                    </div>
+                `);
+
+            markers.push(bedMarker);
+        }
     });
 
     // Draw Polyline (Only for active locations)
@@ -276,6 +318,7 @@ function renderMapElements() {
                     'walking': '<i class="fa-solid fa-person-walking" style="margin-right: 4px;"></i>',
                     'biking': '<i class="fa-solid fa-person-biking" style="margin-right: 4px;"></i>',
                     'car': '<i class="fa-solid fa-car" style="margin-right: 4px;"></i>',
+                    'train': '<i class="fa-solid fa-train" style="margin-right: 4px;"></i>',
                     'boat': '<i class="fa-solid fa-sailboat" style="margin-right: 4px;"></i>',
                     'plane': '<i class="fa-solid fa-plane" style="margin-right: 4px;"></i>'
                 };
@@ -296,464 +339,6 @@ function renderMapElements() {
 
                 travelTimeMarkers.push(travelTimeMarker);
             }
-        }
-    }
-}
-
-function toggleDisable(id) {
-    const locIndex = locations.findIndex(l => l.id === id);
-    if (locIndex === -1) return;
-
-    const loc = locations[locIndex];
-    loc.disabled = !loc.disabled;
-
-    // Remove from current position
-    locations.splice(locIndex, 1);
-
-    if (loc.disabled) {
-        // If disabling, move to end of list
-        locations.push(loc);
-    } else {
-        // If enabling, move to end of ACTIVE items (before first disabled item)
-        const firstDisabledIndex = locations.findIndex(l => l.disabled);
-        if (firstDisabledIndex === -1) {
-            locations.push(loc);
-        } else {
-            locations.splice(firstDisabledIndex, 0, loc);
-        }
-    }
-
-    renderApp();
-    saveData();
-}
-
-function deleteLocation(id) {
-    if (confirm('Delete this location?')) {
-        locations = locations.filter(l => l.id !== id);
-        renderApp();
-        saveData();
-    }
-}
-
-function updateStats() {
-    locationCount.innerText = `${locations.length} Stop${locations.length !== 1 ? 's' : ''}`;
-}
-
-function saveData() {
-    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
-}
-
-// Render Itinerary List
-function renderItineraryList() {
-    itineraryList.innerHTML = '';
-
-    if (locations.length === 0) {
-        itineraryList.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-map-location-dot"></i>
-                <p>No locations added yet. Click on the map to start planning!</p>
-            </div>
-        `;
-        return;
-    }
-
-    let activeCount = 0;
-
-    locations.forEach((loc, index) => {
-        const card = document.createElement('div');
-        card.className = `location-card ${loc.disabled ? 'disabled' : ''}`;
-        card.dataset.id = loc.id;
-
-        // Calculate number only for active items
-        let displayNumber = '';
-        if (!loc.disabled) {
-            activeCount++;
-            displayNumber = activeCount;
-        }
-
-        const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80';
-
-        // Build activities HTML
-        let activitiesHTML = '';
-        if (loc.activities) {
-            if (loc.activities.allDay) {
-                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-calendar-day"></i> <span><strong>All Day:</strong> ${loc.activities.allDay}</span></div>`;
-            }
-            if (loc.activities.morning) {
-                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-sun"></i> <span><strong>Morning:</strong> ${loc.activities.morning}</span></div>`;
-            }
-            if (loc.activities.afternoon) {
-                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-cloud-sun"></i> <span><strong>Afternoon:</strong> ${loc.activities.afternoon}</span></div>`;
-            }
-        }
-
-        card.innerHTML = `
-            <div class="card-image" style="background-image: url('${bgImage}')">
-                <div class="card-header-overlay">
-                    ${!loc.disabled ? `<div class="card-number">${displayNumber}</div>` : ''}
-                    <h3 class="card-title">${loc.name}</h3>
-                </div>
-                <div class="card-weather" id="weather-${loc.id}">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                </div>
-                <div class="card-actions">
-                    <button class="card-action-btn disable" onclick="event.stopPropagation(); toggleDisable('${loc.id}')" title="${loc.disabled ? 'Enable' : 'Disable'}">
-                        <i class="fa-solid ${loc.disabled ? 'fa-eye' : 'fa-eye-slash'}"></i>
-                    </button>
-                    <button class="card-action-btn edit" onclick="event.stopPropagation(); editLocation('${loc.id}')" title="Edit">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                    <button class="card-action-btn delete" onclick="event.stopPropagation(); deleteLocation('${loc.id}')" title="Delete">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="card-content">
-                <div class="card-meta">
-                    ${loc.travelTime ? `<div class="meta-item"><i class="fa-solid fa-clock"></i> ${loc.travelTime}</div>` : ''}
-                    ${loc.placeToStay ? `<div class="meta-item"><i class="fa-solid fa-bed"></i> ${loc.placeToStay}</div>` : ''}
-                </div>
-                <div class="card-details">
-                    ${activitiesHTML}
-                    ${loc.kidsActivity ? `<div class="detail-row"><i class="fa-solid fa-child-reaching"></i> <span>Kids: ${loc.kidsActivity}</span></div>` : ''}
-                    ${loc.foodOptions ? `<div class="detail-row"><i class="fa-solid fa-utensils"></i> <span>Food: ${loc.foodOptions}</span></div>` : ''}
-                    ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb" style="color: #ffaa00; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
-                </div>
-            </div>
-        `;
-
-        // Fetch weather
-        fetchWeather(loc.lat, loc.lng, `weather-${loc.id}`);
-
-        // Add click handler to toggle expanded state and center map
-        card.addEventListener('click', function (e) {
-            // Don't toggle if clicking on action buttons
-            if (e.target.closest('.card-action-btn')) return;
-            this.classList.toggle('expanded');
-
-            // Center map on this location
-            map.setView([loc.lat, loc.lng], 10, {
-                delayOnTouchOnly: true,
-                onEnd: function (evt) {
-                    const itemEl = evt.item;
-                    const newIndex = evt.newIndex;
-                    const oldIndex = evt.oldIndex;
-
-                    // Update State
-                    const movedItem = locations.splice(oldIndex, 1)[0];
-                    locations.splice(newIndex, 0, movedItem);
-
-                    // Re-render to update numbers and map
-                    renderApp();
-                    saveData();
-                }
-            });
-        });
-
-        itineraryList.appendChild(card);
-    });
-}
-
-// Modal & Form Logic
-function openModal(editId = null) {
-    locationModal.classList.add('active');
-
-    // Tab Logic
-    const tabs = document.querySelectorAll('.tab');
-    const contents = document.querySelectorAll('.tab-content');
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(`${tab.dataset.tab}-content`).classList.add('active');
-        });
-    });
-
-    // Travel Mode Selector Logic - Reset active state
-    const modeButtons = document.querySelectorAll('.travel-mode-btn');
-    modeButtons.forEach(btn => btn.classList.remove('active'));
-
-    if (editId) {
-        // Edit Mode
-        const loc = locations.find(l => l.id === editId);
-        document.getElementById('modalTitle').innerText = 'Edit Location';
-        document.getElementById('locationId').value = loc.id;
-        document.getElementById('locationLat').value = loc.lat;
-        document.getElementById('locationLng').value = loc.lng;
-        document.getElementById('locationName').value = loc.name;
-        document.getElementById('imageUrl').value = loc.imageUrl;
-        document.getElementById('travelTime').value = loc.travelTime;
-        const mode = loc.travelMode || '';
-        document.getElementById('travelMode').value = mode;
-
-        // Set active button
-        if (mode) {
-            const activeBtn = document.querySelector(`.travel-mode-btn[data-mode="${mode}"]`);
-            if (activeBtn) activeBtn.classList.add('active');
-        }
-        document.getElementById('placeToStay').value = loc.placeToStay;
-        document.getElementById('morningActivity').value = loc.activities.morning;
-        document.getElementById('afternoonActivity').value = loc.activities.afternoon;
-        document.getElementById('allDayActivity').value = loc.activities.allDay;
-        document.getElementById('kidsActivity').value = loc.kidsActivity;
-        document.getElementById('foodOptions').value = loc.foodOptions;
-        document.getElementById('funFact').value = loc.funFact;
-    } else {
-        // Add Mode
-        document.getElementById('modalTitle').innerText = 'Add Location';
-        locationForm.reset();
-        if (locationSearch) locationSearch.value = ''; // Clear search
-        document.getElementById('locationId').value = '';
-        if (tempClickCoords) {
-            document.getElementById('locationLat').value = tempClickCoords.lat;
-            document.getElementById('locationLng').value = tempClickCoords.lng;
-        }
-    }
-}
-
-function closeModal() {
-    locationModal.classList.remove('active');
-    tempClickCoords = null;
-}
-
-// Drag and Drop Logic
-function setupDragAndDrop() {
-    console.log('setupDragAndDrop called');
-    const el = document.getElementById('itineraryList');
-    if (!el) {
-        console.error('itineraryList not found');
-        return;
-    }
-
-    if (typeof Sortable !== 'undefined') {
-        console.log('SortableJS found, creating instance');
-        Sortable.create(el, {
-            animation: 150,
-            delay: 150, // Add delay to prevent accidental drags
-            delayOnTouchOnly: true, // Only delay on touch devices
-            filter: '.card-action-btn', // Prevent dragging from buttons
-            preventOnFilter: false, // Allow clicks on filtered elements
-            onEnd: function (evt) {
-                console.log('Drag ended', evt);
-                const newIndex = evt.newIndex;
-                const oldIndex = evt.oldIndex;
-
-                // Update State
-                const movedItem = locations.splice(oldIndex, 1)[0];
-                locations.splice(newIndex, 0, movedItem);
-
-                // Re-render to update numbers and map
-                renderApp();
-                saveData();
-            }
-        });
-    } else {
-        console.warn('SortableJS not loaded');
-    }
-}
-
-// Event Listeners
-function setupEventListeners() {
-    // Modal Close Buttons
-    document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.addEventListener('click', closeModal);
-    });
-
-    // Form Submit
-    locationForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const id = document.getElementById('locationId').value || Date.now().toString();
-        const newLocation = {
-            id: id,
-            lat: parseFloat(document.getElementById('locationLat').value),
-            lng: parseFloat(document.getElementById('locationLng').value),
-            name: document.getElementById('locationName').value,
-            imageUrl: document.getElementById('imageUrl').value,
-            travelTime: document.getElementById('travelTime').value,
-            travelMode: document.getElementById('travelMode').value,
-            placeToStay: document.getElementById('placeToStay').value,
-            activities: {
-                morning: document.getElementById('morningActivity').value,
-                afternoon: document.getElementById('afternoonActivity').value,
-                allDay: document.getElementById('allDayActivity').value
-            },
-            kidsActivity: document.getElementById('kidsActivity').value,
-            foodOptions: document.getElementById('foodOptions').value,
-            funFact: document.getElementById('funFact').value
-        };
-
-        const existingIndex = locations.findIndex(l => l.id === id);
-        if (existingIndex > -1) {
-            locations[existingIndex] = newLocation;
-        } else {
-            locations.push(newLocation);
-        }
-
-        closeModal();
-        renderApp();
-        saveData();
-    });
-
-    // Reset Button
-    resetBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to clear your itinerary?')) {
-            locations = [];
-            renderApp();
-            saveData();
-        }
-    });
-
-    // Info Modal
-    const infoBtn = document.getElementById('infoBtn');
-    const infoModal = document.getElementById('infoModal');
-    const closeInfoModal = document.getElementById('closeInfoModal');
-
-    if (infoBtn && infoModal && closeInfoModal) {
-        infoBtn.addEventListener('click', () => {
-            infoModal.classList.add('active');
-        });
-
-        closeInfoModal.addEventListener('click', () => {
-            infoModal.classList.remove('active');
-        });
-
-        // Close info modal when clicking outside
-        infoModal.addEventListener('click', (e) => {
-            if (e.target === infoModal) {
-                infoModal.classList.remove('active');
-            }
-        });
-    }
-
-    // Theme Toggle Button
-    if (themeToggleBtn) {
-        themeToggleBtn.addEventListener('click', toggleTheme);
-    }
-
-    // Fullscreen Button
-    if (fullscreenBtn) {
-        fullscreenBtn.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.error(`Fullscreen error: ${err.message}`);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        });
-
-        // Update icon when fullscreen state changes
-        document.addEventListener('fullscreenchange', () => {
-            const icon = fullscreenBtn.querySelector('i');
-            if (document.fullscreenElement) {
-                icon.classList.remove('fa-expand');
-                icon.classList.add('fa-compress');
-                fullscreenBtn.title = "Exit Full Screen";
-            } else {
-                icon.classList.remove('fa-compress');
-                icon.classList.add('fa-expand');
-                fullscreenBtn.title = "Toggle Full Screen";
-            }
-        });
-    }
-
-    // Export Button
-    if (printBtn) {
-        printBtn.addEventListener('click', () => window.print());
-    }
-
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportItinerary);
-    } else {
-        const dynamicExportBtn = document.getElementById('exportBtn');
-        if (dynamicExportBtn) dynamicExportBtn.addEventListener('click', exportItinerary);
-    }
-
-    // Event Delegation for Edit/Delete buttons in Itinerary List
-    itineraryList.addEventListener('click', (e) => {
-        const btn = e.target.closest('.card-action-btn');
-        if (!btn) return;
-
-        const card = btn.closest('.location-card');
-        const id = card.dataset.id;
-
-        if (btn.classList.contains('edit')) {
-            editLocation(id);
-        } else if (btn.classList.contains('delete')) {
-            deleteLocation(id);
-        }
-    });
-
-    // Travel Mode Selector Buttons
-    const modeButtons = document.querySelectorAll('.travel-mode-btn');
-    const travelModeInput = document.getElementById('travelMode');
-
-    modeButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            modeButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            travelModeInput.value = btn.dataset.mode;
-        });
-    });
-
-    // Location Search Listener
-    if (locationSearch) {
-        locationSearch.addEventListener('input', debounce((e) => {
-            const query = e.target.value.trim();
-            if (query.length > 2) {
-                searchLocation(query);
-            }
-        }, 1500));
-    }
-}
-
-// Helper Functions
-function editLocation(id) {
-    openModal(id);
-}
-
-function deleteLocation(id) {
-    if (confirm('Delete this location?')) {
-        locations = locations.filter(l => l.id !== id);
-        renderApp();
-        saveData();
-    }
-}
-
-function updateStats() {
-    locationCount.innerText = `${locations.length} Stop${locations.length !== 1 ? 's' : ''}`;
-}
-
-function saveData() {
-    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
-}
-
-// Weather Functions
-async function fetchWeather(lat, lng, elementId) {
-    try {
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
-        const data = await response.json();
-
-        if (data.current_weather) {
-            const temp = Math.round(data.current_weather.temperature);
-            const code = data.current_weather.weathercode;
-            const iconClass = getWeatherIcon(code);
-
-            const weatherEl = document.getElementById(elementId);
-            if (weatherEl) {
-                weatherEl.innerHTML = `<i class="${iconClass}"></i> ${temp}°C`;
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching weather:', error);
-        const weatherEl = document.getElementById(elementId);
-        if (weatherEl) {
-            weatherEl.style.display = 'none';
         }
     }
 }
@@ -846,13 +431,25 @@ function exportItinerary() {
         kml += `        <Data name="imageUrl"><value>${escapeXml(loc.imageUrl || '')}</value></Data>\n`;
         kml += `        <Data name="travelTime"><value>${escapeXml(loc.travelTime || '')}</value></Data>\n`;
         kml += `        <Data name="travelMode"><value>${escapeXml(loc.travelMode || '')}</value></Data>\n`;
+        kml += `        <Data name="ticketNumber"><value>${escapeXml(loc.ticketNumber || '')}</value></Data>\n`;
+        kml += `        <Data name="departureTime"><value>${escapeXml(loc.departureTime || '')}</value></Data>\n`;
         kml += `        <Data name="placeToStay"><value>${escapeXml(loc.placeToStay || '')}</value></Data>\n`;
+        kml += `        <Data name="stayAddress"><value>${escapeXml(loc.stayAddress || '')}</value></Data>\n`;
+        kml += `        <Data name="stayLat"><value>${loc.stayLat || ''}</value></Data>\n`;
+        kml += `        <Data name="stayLng"><value>${loc.stayLng || ''}</value></Data>\n`;
+        kml += `        <Data name="stayDateFrom"><value>${escapeXml(loc.stayDateFrom || '')}</value></Data>\n`;
+        kml += `        <Data name="stayDateTo"><value>${escapeXml(loc.stayDateTo || '')}</value></Data>\n`;
+        kml += `        <Data name="checkoutTime"><value>${escapeXml(loc.checkoutTime || '')}</value></Data>\n`;
         kml += `        <Data name="morningActivity"><value>${escapeXml(loc.activities?.morning || '')}</value></Data>\n`;
         kml += `        <Data name="afternoonActivity"><value>${escapeXml(loc.activities?.afternoon || '')}</value></Data>\n`;
         kml += `        <Data name="allDayActivity"><value>${escapeXml(loc.activities?.allDay || '')}</value></Data>\n`;
         kml += `        <Data name="kidsActivity"><value>${escapeXml(loc.kidsActivity || '')}</value></Data>\n`;
+        kml += `        <Data name="foodBreakfast"><value>${escapeXml(loc.food?.breakfast || '')}</value></Data>\n`;
+        kml += `        <Data name="foodLunch"><value>${escapeXml(loc.food?.lunch || '')}</value></Data>\n`;
+        kml += `        <Data name="foodDinner"><value>${escapeXml(loc.food?.dinner || '')}</value></Data>\n`;
         kml += `        <Data name="foodOptions"><value>${escapeXml(loc.foodOptions || '')}</value></Data>\n`;
         kml += `        <Data name="funFact"><value>${escapeXml(loc.funFact || '')}</value></Data>\n`;
+        kml += `        <Data name="phrases"><value>${escapeXml(loc.phrases || '')}</value></Data>\n`;
         kml += `        <Data name="disabled"><value>${loc.disabled || false}</value></Data>\n`;
         kml += '      </ExtendedData>\n';
         kml += '    </Placemark>\n';
@@ -939,15 +536,29 @@ function importItinerary(event) {
                         imageUrl: getData('imageUrl'),
                         travelTime: getData('travelTime'),
                         travelMode: getData('travelMode'),
+                        ticketNumber: getData('ticketNumber'),
+                        departureTime: getData('departureTime'),
                         placeToStay: getData('placeToStay'),
+                        stayAddress: getData('stayAddress'),
+                        stayLat: getData('stayLat') ? parseFloat(getData('stayLat')) : null,
+                        stayLng: getData('stayLng') ? parseFloat(getData('stayLng')) : null,
+                        stayDateFrom: getData('stayDateFrom'),
+                        stayDateTo: getData('stayDateTo'),
+                        checkoutTime: getData('checkoutTime'),
                         activities: {
                             morning: getData('morningActivity'),
                             afternoon: getData('afternoonActivity'),
                             allDay: getData('allDayActivity')
                         },
                         kidsActivity: getData('kidsActivity'),
+                        food: {
+                            breakfast: getData('foodBreakfast'),
+                            lunch: getData('foodLunch'),
+                            dinner: getData('foodDinner')
+                        },
                         foodOptions: getData('foodOptions'),
                         funFact: getData('funFact'),
+                        phrases: getData('phrases'),
                         disabled: getData('disabled') === 'true'
                     };
                 });
@@ -964,4 +575,624 @@ function importItinerary(event) {
         event.target.value = '';
     };
     reader.readAsText(file);
+}
+
+function toggleDisable(id) {
+    const locIndex = locations.findIndex(l => l.id === id);
+    if (locIndex === -1) return;
+
+    const loc = locations[locIndex];
+    loc.disabled = !loc.disabled;
+
+    // Remove from current position
+    locations.splice(locIndex, 1);
+
+    if (loc.disabled) {
+        // If disabling, move to end of list
+        locations.push(loc);
+    } else {
+        // If enabling, move to end of ACTIVE items (before first disabled item)
+        const firstDisabledIndex = locations.findIndex(l => l.disabled);
+        if (firstDisabledIndex === -1) {
+            locations.push(loc);
+        } else {
+            locations.splice(firstDisabledIndex, 0, loc);
+        }
+    }
+
+    renderApp();
+    saveData();
+}
+
+function deleteLocation(id) {
+    if (confirm('Delete this location?')) {
+        locations = locations.filter(l => l.id !== id);
+        renderApp();
+        saveData();
+    }
+}
+
+function updateStats() {
+    locationCount.innerText = `${locations.length} Stop${locations.length !== 1 ? 's' : ''}`;
+}
+
+function saveData() {
+    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
+}
+
+// Render Itinerary List
+function renderItineraryList() {
+    itineraryList.innerHTML = '';
+
+    if (locations.length === 0) {
+        itineraryList.innerHTML = `
+            <div class="empty-state">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <p>No locations added yet. Click on the map to start planning!</p>
+            </div>
+        `;
+        return;
+    }
+
+    let activeCount = 0;
+
+    locations.forEach((loc, index) => {
+        const card = document.createElement('div');
+        card.className = `location-card ${loc.disabled ? 'disabled' : ''}`;
+        card.dataset.id = loc.id;
+
+        // Calculate number only for active items
+        let displayNumber = '';
+        if (!loc.disabled) {
+            activeCount++;
+            displayNumber = activeCount;
+        }
+
+        const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80';
+
+        // Build activities HTML
+        let activitiesHTML = '';
+        if (loc.activities) {
+            if (loc.activities.allDay) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-calendar-day"></i> <span><strong>All Day:</strong> ${loc.activities.allDay}</span></div>`;
+            }
+            if (loc.activities.morning) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-sun"></i> <span><strong>Morning:</strong> ${loc.activities.morning}</span></div>`;
+            }
+            if (loc.activities.afternoon) {
+                activitiesHTML += `<div class="detail-row"><i class="fa-solid fa-cloud-sun"></i> <span><strong>Afternoon:</strong> ${loc.activities.afternoon}</span></div>`;
+            }
+        }
+
+        // Format Dates
+        let dateStr = '';
+        if (loc.stayDateFrom && loc.stayDateTo) {
+            dateStr = `${new Date(loc.stayDateFrom).toLocaleDateString()} - ${new Date(loc.stayDateTo).toLocaleDateString()}`;
+        } else if (loc.stayDateFrom) {
+            dateStr = `Check-in: ${new Date(loc.stayDateFrom).toLocaleDateString()}`;
+        }
+
+        // Calculate Travel Time if missing
+        let displayTravelTime = loc.travelTime;
+        if (!displayTravelTime && index > 0) {
+            // Find previous active location
+            let prevIndex = index - 1;
+            while (prevIndex >= 0 && locations[prevIndex].disabled) {
+                prevIndex--;
+            }
+
+            if (prevIndex >= 0) {
+                const prev = locations[prevIndex];
+                const dist = calculateDistance(prev.lat, prev.lng, loc.lat, loc.lng);
+                displayTravelTime = estimateTravelTime(dist, loc.travelMode || 'car');
+            }
+        }
+
+        card.innerHTML = `
+            <div class="card-image" style="background-image: url('${bgImage}')">
+                <div class="card-header-overlay">
+                    ${!loc.disabled ? `<div class="card-number">${displayNumber}</div>` : ''}
+                    <h3 class="card-title">${loc.name}</h3>
+                </div>
+                <div class="card-weather" id="weather-${loc.id}">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                </div>
+                <div class="card-actions">
+                    <button class="card-action-btn disable" onclick="event.stopPropagation(); toggleDisable('${loc.id}')" title="${loc.disabled ? 'Enable' : 'Disable'}">
+                        <i class="fa-solid ${loc.disabled ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                    </button>
+                    <button class="card-action-btn edit" onclick="event.stopPropagation(); editLocation('${loc.id}')" title="Edit">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="card-action-btn delete" onclick="event.stopPropagation(); deleteLocation('${loc.id}')" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="card-meta">
+                    ${loc.travelMode ? `<div class="meta-item"><i class="fa-solid fa-${loc.travelMode === 'walking' ? 'person-walking' : loc.travelMode === 'biking' ? 'person-biking' : loc.travelMode === 'train' ? 'train' : loc.travelMode === 'boat' ? 'sailboat' : loc.travelMode === 'plane' ? 'plane' : 'car'}"></i>${displayTravelTime ? ` ${displayTravelTime}` : ''}</div>` : (displayTravelTime ? `<div class="meta-item"><i class="fa-solid fa-clock"></i> ${displayTravelTime}</div>` : '')}
+                    ${loc.departureTime ? `<div class="meta-item"><i class="fa-solid fa-plane-departure"></i> ${loc.departureTime}</div>` : ''}
+                    ${loc.ticketNumber ? `<div class="meta-item"><i class="fa-solid fa-ticket"></i> ${loc.ticketNumber}</div>` : ''}
+                </div>
+                <div class="card-details">
+                    ${loc.placeToStay ? `
+                        <div class="detail-row">
+                            <i class="fa-solid fa-bed"></i> 
+                            <div>
+                                <strong>${loc.placeToStay}</strong>
+                                ${loc.stayAddress ? `<div style="font-size: 0.8em; color: #999;">${loc.stayAddress}</div>` : ''}
+                                ${dateStr ? `<div style="font-size: 0.8em; color: #999;">${dateStr}${loc.stayDateFrom && loc.stayDateTo ? ` <span style="color: #666;">(${Math.round((new Date(loc.stayDateTo) - new Date(loc.stayDateFrom)) / (1000 * 60 * 60 * 24))} nights)</span>` : ''}</div>` : ''}
+                                ${loc.checkoutTime ? `<div style="font-size: 0.8em; color: #999;"><i class="fa-solid fa-clock"></i> Check-out: ${loc.checkoutTime}</div>` : ''}
+                            </div>
+                        </div>` : ''}
+                    ${activitiesHTML}
+                    ${loc.kidsActivity ? `<div class="detail-row"><i class="fa-solid fa-child-reaching"></i> <span>Kids: ${loc.kidsActivity}</span></div>` : ''}
+                    ${loc.food && loc.food.breakfast ? `<div class="detail-row"><i class="fa-solid fa-mug-hot"></i> <span><strong>Breakfast:</strong> ${loc.food.breakfast}</span></div>` : ''}
+                    ${loc.food && loc.food.lunch ? `<div class="detail-row"><i class="fa-solid fa-burger"></i> <span><strong>Lunch:</strong> ${loc.food.lunch}</span></div>` : ''}
+                    ${loc.food && loc.food.dinner ? `<div class="detail-row"><i class="fa-solid fa-utensils"></i> <span><strong>Dinner:</strong> ${loc.food.dinner}</span></div>` : ''}
+                    ${loc.foodOptions ? `<div class="detail-row"><i class="fa-solid fa-utensils"></i> <span>Food: ${loc.foodOptions}</span></div>` : ''}
+                    ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb" style="color: #ffaa00; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
+                    ${loc.phrases ? `<div class="phrases-section"><strong><i class="fa-solid fa-language"></i> Phrases:</strong> ${loc.phrases}</div>` : ''}
+                </div>
+            </div>
+        `;
+
+        // Fetch weather
+        fetchWeather(loc.lat, loc.lng, `weather-${loc.id}`);
+
+        // Add click handler to toggle expanded state and center map
+        card.addEventListener('click', function (e) {
+            // Don't toggle if clicking on action buttons
+            if (e.target.closest('.card-action-btn')) return;
+            this.classList.toggle('expanded');
+
+            // Center map on this location
+            map.setView([loc.lat, loc.lng], 10, {
+                delayOnTouchOnly: true,
+                onEnd: function (evt) {
+                    const itemEl = evt.item;
+                    const newIndex = evt.newIndex;
+                    const oldIndex = evt.oldIndex;
+
+                    // Update State
+                    const movedItem = locations.splice(oldIndex, 1)[0];
+                    locations.splice(newIndex, 0, movedItem);
+
+                    // Re-render to update numbers and map
+                    renderApp();
+                    saveData();
+                }
+            });
+        });
+
+        itineraryList.appendChild(card);
+    });
+}
+
+// Modal & Form Logic
+function openModal(editId = null) {
+    locationModal.classList.add('active');
+
+    // Inner Tab Logic (Activities)
+    const tabs = document.querySelectorAll('.tab');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`${tab.dataset.tab}-content`).classList.add('active');
+        });
+    });
+
+    // Main Tab Logic
+    const mainTabs = document.querySelectorAll('.main-tab');
+    const mainContents = document.querySelectorAll('.main-tab-content');
+
+    // Reset to first tab when opening modal
+    mainTabs.forEach(t => t.classList.remove('active'));
+    mainContents.forEach(c => c.classList.remove('active'));
+    if (mainTabs.length > 0) mainTabs[0].classList.add('active');
+    if (mainContents.length > 0) mainContents[0].classList.add('active');
+
+    mainTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            mainTabs.forEach(t => t.classList.remove('active'));
+            mainContents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+        });
+    });
+
+    // Travel Mode Selector Logic - Reset active state
+    const modeButtons = document.querySelectorAll('.travel-mode-btn');
+    modeButtons.forEach(btn => btn.classList.remove('active'));
+
+    if (editId) {
+        // Edit Mode
+        const loc = locations.find(l => l.id === editId);
+        document.getElementById('modalTitle').innerText = 'Edit Location';
+        document.getElementById('locationId').value = loc.id;
+        document.getElementById('locationLat').value = loc.lat;
+        document.getElementById('locationLng').value = loc.lng;
+        document.getElementById('locationName').value = loc.name;
+        document.getElementById('imageUrl').value = loc.imageUrl || '';
+        document.getElementById('travelTime').value = loc.travelTime || '';
+        const mode = loc.travelMode || '';
+        document.getElementById('travelMode').value = mode;
+
+        // Set active button
+        if (mode) {
+            const activeBtn = document.querySelector(`.travel-mode-btn[data-mode="${mode}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        document.getElementById('ticketNumber').value = loc.ticketNumber || '';
+        document.getElementById('departureTime').value = loc.departureTime || '';
+
+        document.getElementById('placeToStay').value = loc.placeToStay || '';
+        document.getElementById('stayAddress').value = loc.stayAddress || '';
+        document.getElementById('stayLat').value = loc.stayLat || '';
+        document.getElementById('stayLng').value = loc.stayLng || '';
+        document.getElementById('stayDateFrom').value = loc.stayDateFrom || '';
+        document.getElementById('stayDateTo').value = loc.stayDateTo || '';
+        document.getElementById('checkoutTime').value = loc.checkoutTime || '';
+
+        document.getElementById('morningActivity').value = loc.activities?.morning || '';
+        document.getElementById('afternoonActivity').value = loc.activities?.afternoon || '';
+        document.getElementById('allDayActivity').value = loc.activities?.allDay || '';
+        document.getElementById('kidsActivity').value = loc.kidsActivity;
+        document.getElementById('foodBreakfast').value = loc.food?.breakfast || '';
+        document.getElementById('foodLunch').value = loc.food?.lunch || '';
+        document.getElementById('foodDinner').value = loc.food?.dinner || '';
+        if (loc.foodOptions && !loc.food) {
+            document.getElementById('foodDinner').value = loc.foodOptions;
+        }
+        document.getElementById('funFact').value = loc.funFact;
+        document.getElementById('phrases').value = loc.phrases || '';
+    } else {
+        // Add Mode
+        document.getElementById('modalTitle').innerText = 'Add Location';
+        locationForm.reset();
+        if (locationSearch) locationSearch.value = ''; // Clear search
+        document.getElementById('locationId').value = '';
+        if (tempClickCoords) {
+            document.getElementById('locationLat').value = tempClickCoords.lat.toFixed(6);
+            document.getElementById('locationLng').value = tempClickCoords.lng.toFixed(6);
+        }
+    }
+}
+
+function closeModal() {
+    locationModal.classList.remove('active');
+    tempClickCoords = null;
+}
+
+// Drag and Drop Logic
+function setupDragAndDrop() {
+    console.log('setupDragAndDrop called');
+    const el = document.getElementById('itineraryList');
+    if (!el) {
+        console.error('itineraryList not found');
+        return;
+    }
+
+    if (typeof Sortable !== 'undefined') {
+        console.log('SortableJS found, creating instance');
+        Sortable.create(el, {
+            animation: 150,
+            delay: 150, // Add delay to prevent accidental drags
+            delayOnTouchOnly: true, // Only delay on touch devices
+            filter: '.card-action-btn', // Prevent dragging from buttons
+            preventOnFilter: false, // Allow clicks on filtered elements
+            onEnd: function (evt) {
+                console.log('Drag ended', evt);
+                const newIndex = evt.newIndex;
+                const oldIndex = evt.oldIndex;
+
+                // Update State
+                const movedItem = locations.splice(oldIndex, 1)[0];
+                locations.splice(newIndex, 0, movedItem);
+
+                // Re-render to update numbers and map
+                renderApp();
+                saveData();
+            }
+        });
+    } else {
+        console.warn('SortableJS not loaded');
+    }
+}
+
+// Event Listeners
+function setupEventListeners() {
+    // Modal Close Buttons
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', closeModal);
+    });
+
+    // Form Submit
+    locationForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('locationId').value || Date.now().toString();
+        const newLocation = {
+            id: id,
+            lat: parseFloat(document.getElementById('locationLat').value),
+            lng: parseFloat(document.getElementById('locationLng').value),
+            name: document.getElementById('locationName').value,
+            imageUrl: document.getElementById('imageUrl').value,
+            travelTime: document.getElementById('travelTime').value,
+            travelMode: document.getElementById('travelMode').value,
+            ticketNumber: document.getElementById('ticketNumber').value,
+            departureTime: document.getElementById('departureTime').value,
+
+            // Stay Details
+            placeToStay: document.getElementById('placeToStay').value,
+            stayAddress: document.getElementById('stayAddress').value,
+            stayLat: document.getElementById('stayLat').value ? parseFloat(document.getElementById('stayLat').value) : null,
+            stayLng: document.getElementById('stayLng').value ? parseFloat(document.getElementById('stayLng').value) : null,
+            stayDateFrom: document.getElementById('stayDateFrom').value,
+            stayDateTo: document.getElementById('stayDateTo').value,
+            checkoutTime: document.getElementById('checkoutTime').value,
+
+            activities: {
+                morning: document.getElementById('morningActivity').value,
+                afternoon: document.getElementById('afternoonActivity').value,
+                allDay: document.getElementById('allDayActivity').value
+            },
+            kidsActivity: document.getElementById('kidsActivity').value,
+            food: {
+                breakfast: document.getElementById('foodBreakfast').value,
+                lunch: document.getElementById('foodLunch').value,
+                dinner: document.getElementById('foodDinner').value
+            },
+            funFact: document.getElementById('funFact').value,
+            phrases: document.getElementById('phrases').value
+        };
+
+        const existingIndex = locations.findIndex(l => l.id === id);
+        if (existingIndex > -1) {
+            locations[existingIndex] = newLocation;
+        } else {
+            locations.push(newLocation);
+        }
+
+        closeModal();
+        renderApp();
+        renderMapElements(); // Update map markers
+        saveData();
+    });
+
+    // Reset Button
+    resetBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear your itinerary?')) {
+            locations = [];
+            renderApp();
+            renderMapElements();
+            saveData();
+        }
+    });
+
+    // Info Modal
+    const infoBtn = document.getElementById('infoBtn');
+    const infoModal = document.getElementById('infoModal');
+    const closeInfoModal = document.getElementById('closeInfoModal');
+
+    if (infoBtn && infoModal && closeInfoModal) {
+        infoBtn.addEventListener('click', () => {
+            infoModal.classList.add('active');
+        });
+
+        closeInfoModal.addEventListener('click', () => {
+            infoModal.classList.remove('active');
+        });
+
+        // Close info modal when clicking outside
+        infoModal.addEventListener('click', (e) => {
+            if (e.target === infoModal) {
+                infoModal.classList.remove('active');
+            }
+        });
+    }
+
+    // Theme Toggle Button
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+
+    // Fullscreen Button
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Fullscreen error: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        });
+
+        // Update icon when fullscreen state changes
+        document.addEventListener('fullscreenchange', () => {
+            const icon = fullscreenBtn.querySelector('i');
+            if (document.fullscreenElement) {
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                fullscreenBtn.title = "Exit Full Screen";
+            } else {
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                fullscreenBtn.title = "Toggle Full Screen";
+            }
+        });
+    }
+
+    // Export Button
+    if (document.getElementById('printBtn')) {
+        document.getElementById('printBtn').addEventListener('click', () => window.print());
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportItinerary);
+    }
+
+    // Import Button
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+    if (importBtn && importFile) {
+        importBtn.addEventListener('click', () => {
+            importFile.click();
+        });
+
+        importFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                importItinerary(e);
+            }
+        });
+    }
+
+    // Event Delegation for Edit/Delete buttons in Itinerary List
+    itineraryList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.card-action-btn');
+        if (!btn) return;
+
+        const card = btn.closest('.location-card');
+        const id = card.dataset.id;
+
+        if (btn.classList.contains('edit')) {
+            editLocation(id);
+        } else if (btn.classList.contains('delete')) {
+            deleteLocation(id);
+        }
+    });
+
+    // Travel Mode Selector Buttons
+    const modeButtons = document.querySelectorAll('.travel-mode-btn');
+    const travelModeInput = document.getElementById('travelMode');
+
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            travelModeInput.value = btn.dataset.mode;
+        });
+    });
+
+    // Location Search Listener
+    if (locationSearch) {
+        locationSearch.addEventListener('input', debounce((e) => {
+            const query = e.target.value.trim();
+            if (query.length > 2) {
+                searchLocation(query);
+            }
+        }, 1500));
+    }
+
+    // Check-in/Check-out date validation and nights calculation
+    const stayDateFrom = document.getElementById('stayDateFrom');
+    const stayDateTo = document.getElementById('stayDateTo');
+    const stayNightsDisplay = document.getElementById('stayNightsDisplay');
+    const stayNightsCount = document.getElementById('stayNightsCount');
+
+    function updateNightsDisplay() {
+        if (stayDateFrom.value && stayDateTo.value) {
+            const checkIn = new Date(stayDateFrom.value);
+            const checkOut = new Date(stayDateTo.value);
+            const nights = Math.round((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+
+            if (nights > 0) {
+                stayNightsCount.textContent = nights;
+                stayNightsDisplay.style.display = 'flex';
+            } else {
+                stayNightsDisplay.style.display = 'none';
+            }
+        } else {
+            stayNightsDisplay.style.display = 'none';
+        }
+    }
+
+    if (stayDateFrom && stayDateTo) {
+        stayDateFrom.addEventListener('change', () => {
+            if (stayDateFrom.value) {
+                // Set minimum checkout date to the day after check-in
+                const checkInDate = new Date(stayDateFrom.value);
+                checkInDate.setDate(checkInDate.getDate() + 1);
+                const minCheckout = checkInDate.toISOString().split('T')[0];
+                stayDateTo.min = minCheckout;
+
+                // If current checkout is before or same as check-in, clear it
+                if (stayDateTo.value && stayDateTo.value <= stayDateFrom.value) {
+                    stayDateTo.value = minCheckout;
+                }
+            }
+            updateNightsDisplay();
+        });
+
+        stayDateTo.addEventListener('change', updateNightsDisplay);
+    }
+
+    // Stay Address Search Listener
+    const stayAddressInput = document.getElementById('stayAddress');
+    if (stayAddressInput) {
+        stayAddressInput.addEventListener('input', debounce((e) => {
+            const query = e.target.value.trim();
+            if (query.length > 2) {
+                // Show loading state
+                const searchIcon = stayAddressInput.parentElement.querySelector('i');
+                if (searchIcon) searchIcon.className = 'fa-solid fa-spinner fa-spin';
+
+                // Use Nominatim API for geocoding
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Reset icon
+                        if (searchIcon) searchIcon.className = 'fa-solid fa-magnifying-glass';
+
+                        if (data && data.length > 0) {
+                            const result = data[0];
+                            document.getElementById('stayLat').value = parseFloat(result.lat).toFixed(4);
+                            document.getElementById('stayLng').value = parseFloat(result.lon).toFixed(4);
+                        }
+                    })
+                    .catch(() => {
+                        if (searchIcon) searchIcon.className = 'fa-solid fa-triangle-exclamation';
+                    });
+            }
+        }, 1500));
+    }
+}
+
+// Helper Functions
+function editLocation(id) {
+    openModal(id);
+}
+
+// Weather Functions
+async function fetchWeather(lat, lng, elementId) {
+    try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        const data = await response.json();
+
+        if (data.current_weather) {
+            const temp = Math.round(data.current_weather.temperature);
+            const code = data.current_weather.weathercode;
+            const iconClass = getWeatherIcon(code);
+
+            const weatherEl = document.getElementById(elementId);
+            if (weatherEl) {
+                weatherEl.innerHTML = `<i class="${iconClass}"></i> ${temp}°C`;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching weather:', error);
+        const weatherEl = document.getElementById(elementId);
+        if (weatherEl) {
+            weatherEl.style.display = 'none';
+        }
+    }
 }
