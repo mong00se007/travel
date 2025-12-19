@@ -1,9 +1,13 @@
 console.log('SCRIPT LOADED: script.js');
 // State Management
 let locations = JSON.parse(localStorage.getItem('travel_planner_locations')) || [];
+let showRestaurants = localStorage.getItem('travel_planner_show_restaurants') !== 'false'; // Default true
+let showSupermarkets = false; // Default false (heavy load)
 let map;
 let mapTileLayer;
 let markers = [];
+let restaurantMarkers = [];
+let supermarketMarkers = [];
 let travelTimeMarkers = [];
 let polyline;
 let tempClickCoords = null;
@@ -19,6 +23,8 @@ let exportBtn;
 let resetBtn;
 let fullscreenBtn;
 let themeToggleBtn;
+let importRestaurantsBtn;
+let importRestaurantsFile;
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,9 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
     itineraryList = document.getElementById('itineraryList');
     locationCount = document.getElementById('locationCount');
     exportBtn = document.getElementById('exportBtn');
-    resetBtn = document.getElementById('resetBtn');
+    resetBtn = document.getElementById('resetBtn'); // Keep for safety or remove if unused in header
     fullscreenBtn = document.getElementById('fullscreenBtn');
     themeToggleBtn = document.getElementById('themeToggle');
+    // New Settings Elements
+    importRestaurantsFile = document.getElementById('importRestaurantsFile');
+    importFile = document.getElementById('importFile');
 
     initMap();
     renderApp();
@@ -485,6 +494,269 @@ function escapeXml(unsafe) {
     });
 }
 
+// CSV Parsing Helper
+function parseCSV(text) {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const results = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+
+        // Handle quoted fields (basic implementation)
+        const row = [];
+        let inQuote = false;
+        let p = 0;
+        let s = '';
+
+        for (let j = 0; j < lines[i].length; j++) {
+            const char = lines[i][j];
+            if (char === '"') {
+                inQuote = !inQuote;
+            } else if (char === ',' && !inQuote) {
+                row.push(s.trim());
+                s = '';
+            } else {
+                s += char;
+            }
+        }
+        row.push(s.trim()); // Push last field
+
+        if (row.length === headers.length) {
+            const obj = {};
+            headers.forEach((h, index) => {
+                obj[h] = row[index] ? row[index].replace(/^"|"$/g, '') : '';
+            });
+            results.push(obj);
+        }
+    }
+    return results;
+}
+
+// Rate-limited Geocoding Queue
+const geocodeQueue = [];
+let isGeocoding = false;
+
+async function processGeocodeQueue() {
+    if (isGeocoding || geocodeQueue.length === 0) return;
+
+    isGeocoding = true;
+    const { restaurant, onComplete } = geocodeQueue.shift();
+
+    try {
+        const query = `${restaurant.location}`; // Add more context if needed
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lng = parseFloat(data[0].lon);
+            onComplete({ ...restaurant, lat, lng });
+        } else {
+            console.warn(`Could not geocode: ${restaurant.name} (${restaurant.location})`);
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+    }
+
+    // Wait 1.1 seconds before next request (Nominitim limit is 1/sec)
+    setTimeout(() => {
+        isGeocoding = false;
+        processGeocodeQueue();
+    }, 1100);
+}
+
+function addRestaurantMarker(r) {
+    const color = '#f97316'; // Orange
+    const iconHtml = `<div style="
+        background-color: ${color};
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    "><i class="fa-solid fa-utensils" style="font-size: 14px;"></i></div>`;
+
+    const icon = L.divIcon({
+        className: 'custom-restaurant-marker',
+        html: iconHtml,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+
+    const popupContent = `
+        <div style="font-family: 'Outfit', sans-serif; color: #0f172a; min-width: 220px;">
+            <h3 style="margin: 0 0 5px 0; color: ${color}; text-align: center;">${r.name}</h3>
+            <div style="font-size: 0.9em; line-height: 1.4;">
+                <p style="margin: 5px 0;"><strong>⭐ Rating:</strong> ${r.star_rating || 'N/A'}</p>
+                <p style="margin: 5px 0;"><strong>💲 Price:</strong> ${r.price || 'N/A'}</p>
+                <p style="margin: 5px 0;"><strong>🍽️ Type:</strong> ${r.type || 'N/A'}</p>
+                ${r.dedicated_gluten_free === 'Yes' ? '<p style="margin: 5px 0; color: #16a34a;"><strong>✅ Dedicated GF</strong></p>' : ''}
+                ${r.gf_menu_items ? `<p style="margin: 5px 0;"><strong>📋 GF Items:</strong> ${r.gf_menu_items}</p>` : ''}
+                ${r.review ? `<p style="margin: 8px 0; padding-top: 8px; border-top: 1px solid #eee; font-style: italic; color: #666;">"${r.review}"</p>` : ''}
+                <p style="margin: 5px 0; color: #888; font-size: 0.8em;">📍 ${r.location}</p>
+            </div>
+        </div>
+    `;
+
+    const marker = L.marker([r.lat, r.lng], { icon: icon })
+        .addTo(map)
+        .bindPopup(popupContent);
+
+    restaurantMarkers.push(marker);
+
+    // Respect toggle
+    if (!showRestaurants) {
+        map.removeLayer(marker);
+    }
+}
+
+function toggleRestaurantsVisibility(show) {
+    showRestaurants = show;
+    localStorage.setItem('travel_planner_show_restaurants', show);
+
+    restaurantMarkers.forEach(marker => {
+        if (show) {
+            if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+    });
+
+    // Save preference
+    localStorage.setItem('travel_planner_show_restaurants', show);
+}
+
+// Supermarket Logic
+async function fetchSupermarkets() {
+    if (!showSupermarkets) return; // Don't fetch if turned off
+
+    // Clear existing supermarkets first to avoid duplicates
+    supermarketMarkers.forEach(m => map.removeLayer(m));
+    supermarketMarkers = [];
+
+    const activeLocations = locations.filter(l => !l.disabled);
+    if (activeLocations.length === 0) return;
+
+    console.log('Fetching supermarkets...');
+
+    // Iterate through locations and fetch supermarkets near each
+    for (const loc of activeLocations) {
+        try {
+            // Overpass API Query
+            // Search for nodes with shop=supermarket or shop=convenience within 30km (30000m)
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["shop"="supermarket"](around:10000,${loc.lat},${loc.lng});
+                );
+                out body 20; 
+            `;
+            // 'out body 20' limits to 20 results per location to prevent overload
+
+            const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+            const data = await response.json();
+
+            if (data.elements) {
+                data.elements.forEach(el => {
+                    addSupermarketMarker(el);
+                });
+            }
+
+        } catch (error) {
+            console.error('Error fetching supermarkets:', error);
+        }
+
+        // Small delay to be nice to the API
+        await new Promise(r => setTimeout(r, 500));
+    }
+}
+
+function addSupermarketMarker(el) {
+    const color = '#10b981'; // Emerald Green
+    const iconHtml = `<div style="
+        background-color: ${color};
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    "><i class="fa-solid fa-cart-shopping" style="font-size: 12px;"></i></div>`;
+
+    const icon = L.divIcon({
+        className: 'custom-supermarket-marker',
+        html: iconHtml,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker([el.lat, el.lon], { icon: icon })
+        .addTo(map)
+        .bindPopup(`
+            <div style="font-family: 'Outfit', sans-serif; color: #0f172a;">
+                <h4 style="margin: 0 0 5px 0; color: ${color};">${el.tags.name || 'Supermarket'}</h4>
+                ${el.tags.brand ? `<p style="margin: 0; font-size: 0.9em;">Brand: ${el.tags.brand}</p>` : ''}
+                ${el.tags.opening_hours ? `<p style="margin: 0; font-size: 0.8em; color: #666;">🕒 ${el.tags.opening_hours}</p>` : ''}
+            </div>
+        `);
+
+    supermarketMarkers.push(marker);
+}
+
+function toggleSupermarketsVisibility(show) {
+    showSupermarkets = show;
+
+    if (show) {
+        if (supermarketMarkers.length === 0) {
+            fetchSupermarkets();
+        } else {
+            supermarketMarkers.forEach(marker => {
+                if (!map.hasLayer(marker)) marker.addTo(map);
+            });
+        }
+    } else {
+        supermarketMarkers.forEach(marker => {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        });
+    }
+}
+
+function importRestaurants(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const csvText = e.target.result;
+        const restaurants = parseCSV(csvText);
+
+        console.log(`Parsed ${restaurants.length} restaurants. Starting geocoding...`);
+        alert(`Found ${restaurants.length} restaurants. They will appear on the map as they are geocoded (this may take a while).`);
+
+        restaurants.forEach(r => {
+            geocodeQueue.push({
+                restaurant: r,
+                onComplete: (geocodedRestaurant) => {
+                    addRestaurantMarker(geocodedRestaurant);
+                }
+            });
+        });
+
+        processGeocodeQueue();
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+}
+
 function importItinerary(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -648,7 +920,7 @@ function renderItineraryList() {
             displayNumber = activeCount;
         }
 
-        const bgImage = loc.imageUrl || 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80';
+        const bgImage = loc.imageUrl || 'https://github.com/mong00se007/travel/raw/main/images/default.png';
 
         // Build activities HTML
         let activitiesHTML = '';
@@ -966,16 +1238,6 @@ function setupEventListeners() {
         saveData();
     });
 
-    // Reset Button
-    resetBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to clear your itinerary?')) {
-            locations = [];
-            renderApp();
-            renderMapElements();
-            saveData();
-        }
-    });
-
     // Info Modal
     const infoBtn = document.getElementById('infoBtn');
     const infoModal = document.getElementById('infoModal');
@@ -1037,21 +1299,99 @@ function setupEventListeners() {
         document.getElementById('printBtn').addEventListener('click', () => window.print());
     }
 
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportItinerary);
-    }
+    // Settings Modal Logic
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeSettingsModal = document.getElementById('closeSettingsModal');
 
-    // Import Button
-    const importBtn = document.getElementById('importBtn');
-    const importFile = document.getElementById('importFile');
-    if (importBtn && importFile) {
-        importBtn.addEventListener('click', () => {
-            importFile.click();
+    // Wire up modal buttons
+    const modalExportBtn = document.getElementById('modalExportBtn');
+    const modalImportBtn = document.getElementById('modalImportBtn');
+    const modalImportRestaurantsBtn = document.getElementById('modalImportRestaurantsBtn');
+    const modalResetBtn = document.getElementById('modalResetBtn');
+    const toggleRestaurants = document.getElementById('toggleRestaurants');
+    const toggleSupermarkets = document.getElementById('toggleSupermarkets');
+
+    if (settingsBtn && settingsModal) {
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('active');
+            // Sync toggle states
+            if (toggleRestaurants) toggleRestaurants.checked = showRestaurants;
+            if (toggleSupermarkets) toggleSupermarkets.checked = showSupermarkets;
         });
 
+        if (closeSettingsModal) {
+            closeSettingsModal.addEventListener('click', () => {
+                settingsModal.classList.remove('active');
+            });
+        }
+
+        // Close on outside click
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) settingsModal.classList.remove('active');
+        });
+
+        // Settings Actions
+        if (modalExportBtn) modalExportBtn.addEventListener('click', exportItinerary);
+
+        if (modalImportBtn && importFile) {
+            modalImportBtn.addEventListener('click', () => importFile.click());
+        }
+
+        if (modalImportRestaurantsBtn && importRestaurantsFile) {
+            modalImportRestaurantsBtn.addEventListener('click', () => importRestaurantsFile.click());
+        }
+
+        if (modalResetBtn) {
+            modalResetBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear your itinerary and all imported restaurants? This cannot be undone.')) {
+                    locations = [];
+                    // Clear restaurants
+                    restaurantMarkers.forEach(m => map.removeLayer(m));
+                    restaurantMarkers = [];
+                    // Clear supermarkets
+                    supermarketMarkers.forEach(m => map.removeLayer(m));
+                    supermarketMarkers = [];
+                    // Clear geocode queue
+                    geocodeQueue.length = 0;
+
+                    renderApp();
+                    renderMapElements();
+                    saveData();
+                    settingsModal.classList.remove('active');
+                }
+            });
+        }
+
+        // Toggle Switch
+        if (toggleRestaurants) {
+            toggleRestaurants.addEventListener('change', (e) => {
+                toggleRestaurantsVisibility(e.target.checked);
+            });
+        }
+
+        if (toggleSupermarkets) {
+            toggleSupermarkets.addEventListener('change', (e) => {
+                toggleSupermarketsVisibility(e.target.checked);
+            });
+        }
+    }
+
+    // Settings File Inputs
+    if (importFile) {
         importFile.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 importItinerary(e);
+                settingsModal.classList.remove('active');
+            }
+        });
+    }
+
+    if (importRestaurantsFile) {
+        importRestaurantsFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                importRestaurants(e);
+                settingsModal.classList.remove('active');
             }
         });
     }
