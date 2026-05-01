@@ -198,6 +198,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
 }
 
 .itinerary-header {
@@ -222,7 +223,7 @@ body {
 }
 
 .itinerary-list {
-    flex: 1;
+    flex: 1 1 0%;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 1.5rem;
@@ -373,6 +374,20 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.card-date {
+    position: absolute;
+    bottom: 10px;
+    left: 1.2rem;
+    z-index: 2;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
 }
 
 .card-actions {
@@ -1005,6 +1020,16 @@ textarea:focus {
         overflow: visible;
     }
 
+    .card-date {
+        position: static !important;
+        display: inline-flex !important;
+        color: #4b5563 !important;
+        font-size: 11pt !important;
+        margin-top: 0.2rem !important;
+        text-shadow: none !important;
+        padding-left: 0.8rem !important;
+    }
+
     .card-number {
         background: #000 !important;
         color: white !important;
@@ -1058,6 +1083,320 @@ textarea:focus {
 
     .phrases-section strong {
         color: #000;
+    }
+}
+
+/* Day Trips / Sub-Locations */
+.day-trips-section {
+    margin-top: 1rem;
+    padding: 0.8rem;
+    background: rgba(0, 210, 255, 0.04);
+    border-radius: 10px;
+    border-left: 3px solid #0ea5e9;
+}
+
+.day-trips-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.day-trips-header i {
+    font-size: 0.9rem;
+}
+
+.day-trips-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.day-trip-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.day-trip-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(0, 210, 255, 0.2);
+}
+
+.day-trip-number {
+    min-width: 42px;
+    height: 22px;
+    background: rgba(14, 165, 233, 0.2);
+    color: #0ea5e9;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .empty-day-trips {
+        display: none !important;
+    }
+    
+    .day-trip-item {
+        background: none !important;
+        border-color: #ccc !important;
+    }
+    
+    .day-trips-section {
+        background: none !important;
+        border-left: 2px solid #666 !important;
+    }
+}
+
+.day-trip-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.day-trip-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-trip-notes {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.day-trip-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.day-trip-item:hover .day-trip-actions {
+    opacity: 1;
+}
+
+.day-trip-action-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.day-trip-action-btn:hover {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+}
+
+.day-trip-action-btn.delete:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* Add Day Trip Button */
+.add-day-trip-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(14, 165, 233, 0.08);
+    border: 1px dashed rgba(14, 165, 233, 0.3);
+    border-radius: 8px;
+    color: #0ea5e9;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.add-day-trip-btn:hover {
+    background: rgba(14, 165, 233, 0.15);
+    border-color: #0ea5e9;
+    transform: translateY(-1px);
+}
+
+.add-day-trip-btn i {
+    font-size: 0.75rem;
+}
+
+/* Inline Day Trip Form */
+.day-trip-form {
+    margin-top: 0.5rem;
+    padding: 0.8rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(14, 165, 233, 0.2);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    animation: fadeIn 0.2s ease;
+}
+
+.day-trip-form .form-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.day-trip-form input,
+.day-trip-form textarea {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-main);
+    font-family: var(--font-body);
+    width: 100%;
+}
+
+.day-trip-form input:focus,
+.day-trip-form textarea:focus {
+    outline: none;
+    border-color: #0ea5e9;
+}
+
+.day-trip-form textarea {
+    resize: vertical;
+    min-height: 36px;
+}
+
+.day-trip-form-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.day-trip-form-actions button {
+    padding: 0.35rem 0.8rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.day-trip-form-actions .save-trip-btn {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    color: white;
+}
+
+.day-trip-form-actions .save-trip-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.day-trip-form-actions .cancel-trip-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+}
+
+.day-trip-form-actions .cancel-trip-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Day Trips Print Styles */
+@media print {
+    .day-trips-section {
+        background: #f0f7ff;
+        border-left: 3px solid #0ea5e9;
+        padding: 0.6rem;
+        margin-top: 0.8rem;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .day-trips-header {
+        color: #0369a1;
+        font-size: 10pt;
+    }
+
+    .day-trip-item {
+        background: none;
+        border: none;
+        border-bottom: 1px solid #e2e8f0;
+        border-radius: 0;
+        padding: 0.3rem 0;
+    }
+
+    .day-trip-item:last-child {
+        border-bottom: none;
+    }
+
+    .day-trip-number {
+        background: #0ea5e9;
+        color: white;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+        font-size: 7pt;
+        min-width: 38px;
+        height: 18px;
+    }
+
+    .day-trip-name {
+        color: black;
+        font-size: 10pt;
+    }
+
+    .day-trip-notes {
+        color: #555;
+        font-size: 9pt;
+    }
+
+    .day-trip-actions,
+    .add-day-trip-btn,
+    .day-trip-form {
+        display: none !important;
+    }
+}
+
+/* Mobile day trip adjustments */
+@media (max-width: 900px) {
+    .day-trip-actions {
+        opacity: 1;
     }
 }
 
@@ -1163,17 +1502,21 @@ textarea:focus {
 
 @media print {
     .card-weather {
-        display: block !important;
-        color: #000 !important;
+        position: static !important;
+        display: inline-flex !important;
+        color: #4b5563 !important;
+        font-size: 10pt !important;
         text-shadow: none !important;
+        margin-top: 0.1rem !important;
+        margin-left: 1rem !important;
     }
 
     .card-weather i {
-        color: #000 !important;
+        color: #4b5563 !important;
+        margin-right: 0.3rem;
     }
 }
 
-/* Settings Modal Styling */
 /* Settings Modal Styling */
 .settings-group {
     background: rgba(255, 255, 255, 0.05);
@@ -1304,4 +1647,253 @@ input:checked+.slider:before {
 
 .info-content p {
     margin-bottom: 0.2rem;
+}
+
+/* Mobile-only reorder arrows — hidden on desktop */
+.card-action-btn.mobile-move-up,
+.card-action-btn.mobile-move-down {
+    display: none;
+}
+
+@media (max-width: 900px) {
+
+    .card-action-btn.mobile-move-up,
+    .card-action-btn.mobile-move-down {
+        display: flex;
+        background: rgba(0, 210, 255, 0.15);
+        color: var(--primary-color);
+        border: 1px solid rgba(0, 210, 255, 0.3);
+        transition: background 0.2s, transform 0.15s;
+    }
+
+    .card-action-btn.mobile-move-up:hover,
+    .card-action-btn.mobile-move-down:hover {
+        background: rgba(0, 210, 255, 0.35);
+        transform: scale(1.1);
+    }
+
+    /* Wider overlay to make room for extra buttons */
+    .card-header-overlay {
+        right: 220px;
+    }
+}
+
+/* Globe container — full size, hidden by default */
+#globe-container {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+}
+
+#globe-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Cloud transition overlay - Premium Soft Fog */
+#map-transition-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease-in-out;
+}
+
+#map-transition-overlay.active {
+    opacity: 1;
+}
+
+/* Itinerary Controls */
+.itinerary-controls {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.grouping-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.toggle-switch.small {
+    width: 36px;
+    height: 18px;
+}
+
+.toggle-switch.small .slider:before {
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+}
+
+.toggle-switch.small input:checked+.slider:before {
+    transform: translateX(18px);
+}
+
+/* Group Headers */
+.group-header {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--primary-color);
+    padding: 0.8rem 1rem;
+    margin: 1rem 0 0.5rem 0;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.group-header:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.group-header h4 {
+    margin: 0;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.group-header .group-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.group-header i.fa-chevron-down {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.group-header.collapsed i.fa-chevron-down {
+    transform: rotate(-90deg);
+}
+
+.group-content {
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+    overflow: hidden;
+    max-height: 20000px;
+    opacity: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    flex-shrink: 0;
+}
+
+.group-header.collapsed+.group-content {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    padding-bottom: 0;
+}
+
+/* Suggested Tags UI */
+.suggested-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    min-height: 20px;
+}
+
+.suggested-tag {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.suggested-tag:hover {
+    background: rgba(0, 210, 255, 0.1);
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.suggested-tag.active {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+    border-color: var(--primary-color);
+    font-weight: 600;
+}
+
+.delete-tag-btn {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: inherit;
+    transition: background 0.2s;
+}
+
+.delete-tag-btn:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
+/* Sync Status */
+.sync-status {
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.sync-status.sync-success {
+    border-color: #10b981;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.sync-status.sync-error {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.sync-status.sync-loading {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }

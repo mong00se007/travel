@@ -23,6 +23,7 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css_tags.css">
 
     <!-- Inline styles for date/time pickers -->
     <style>
@@ -111,6 +112,8 @@
             <section class="map-section">
                 <div class="map-container">
                     <div id="map"></div>
+                    <div id="globe-container"></div>
+                    <div id="map-transition-overlay"></div>
                     <div class="map-overlay-info">
                         <p><i class="fa-solid fa-circle-info"></i> Click on the map to add a new location</p>
                     </div>
@@ -121,7 +124,16 @@
             <section class="itinerary-section">
                 <div class="itinerary-header">
                     <h2>Your Journey</h2>
-                    <span class="badge" id="locationCount">0 Stops</span>
+                    <div class="itinerary-controls">
+                        <div class="grouping-toggle">
+                            <span>Group by Tag</span>
+                            <label class="toggle-switch small">
+                                <input type="checkbox" id="toggleGrouping">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <span class="badge" id="locationCount">0 Stops</span>
+                    </div>
                 </div>
 
                 <div class="itinerary-list" id="itineraryList">
@@ -198,8 +210,21 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="travelTime">Travel Time (from previous)</label>
-                            <input type="text" id="travelTime" placeholder="e.g., 2h 30m (leave blank for estimate)">
+                            <label for="locationTags">Tags (comma separated, e.g., France, Spain)</label>
+                            <input type="text" id="locationTags" placeholder="e.g., France, Trip Leg 1" list="tagList">
+                            <datalist id="tagList"></datalist>
+                            <div id="suggestedTags" class="suggested-tags-container"></div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="travelTime">Travel Time</label>
+                                <input type="text" id="travelTime" placeholder="e.g., 2h 30m">
+                            </div>
+                            <div class="form-group">
+                                <label for="stopDate">Travel Date</label>
+                                <input type="date" id="stopDate">
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -311,6 +336,18 @@
                             <label for="kidsActivity">For the Kids</label>
                             <input type="text" id="kidsActivity" placeholder="Fun stuff for children...">
                         </div>
+
+                        <!-- Day Trips Management -->
+                        <div class="day-trips-section" style="margin-top: 1rem;">
+                            <div class="day-trips-header"><i class="fa-solid fa-map-pin"></i> Day Trips</div>
+                            <div class="day-trips-list" id="modalDayTripsList">
+                                <!-- Day trip items rendered by JS -->
+                            </div>
+                            <button type="button" class="add-day-trip-btn" id="modalAddDayTripBtn">
+                                <i class="fa-solid fa-plus"></i> Add Day Trip
+                            </button>
+                            <div id="modalDayTripForm" style="display: none;"></div>
+                        </div>
                     </div>
 
                     <!-- Tab 4: Food Options -->
@@ -377,6 +414,104 @@
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <div class="setting-item">
+                        <span>Globe-like Map View</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleGlobeView">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3><i class="fa-solid fa-cloud"></i> Network Sync (WebDAV)</h3>
+                    <div class="setting-item">
+                        <span>Enable Network Sync</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="syncEnabled">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="syncUrl">WebDAV Base URL</label>
+                        <input type="url" id="syncUrl" placeholder="http://nas-ip:5005/Travel/">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kmlFileName">KML Filename</label>
+                            <input type="text" id="kmlFileName" placeholder="itinerary.kml">
+                        </div>
+                        <div class="form-group">
+                            <label for="csvFileName">CSV Filename</label>
+                            <input type="text" id="csvFileName" placeholder="restaurants.csv">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="syncUsername">Username</label>
+                            <input type="text" id="syncUsername">
+                        </div>
+                        <div class="form-group">
+                            <label for="syncPassword">Password</label>
+                            <input type="password" id="syncPassword">
+                        </div>
+                    </div>
+                    
+                    <div id="syncStatus" class="sync-status" style="margin: 1rem 0; font-size: 0.85em; text-align: center;">
+                        Status: Local Mode
+                    </div>
+
+                    <div class="action-grid">
+                        <button id="pullKmlBtn" class="btn btn-secondary" title="Pull KML from NAS">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Pull KML
+                        </button>
+                        <button id="pushKmlBtn" class="btn btn-secondary" title="Push KML to NAS">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Push KML
+                        </button>
+                        <button id="pullCsvBtn" class="btn btn-secondary" title="Pull CSV from NAS">
+                            <i class="fa-solid fa-file-import"></i> Pull CSV
+                        </button>
+                        <button id="pushCsvBtn" class="btn btn-secondary" title="Push CSV to NAS">
+                            <i class="fa-solid fa-file-export"></i> Push CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3><i class="fa-solid fa-link"></i> Linked Network Files</h3>
+                    <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 1rem;">
+                        Link directly to KML/CSV files on your NAS. This enables auto-save on Windows/Desktop. 
+                        <span style="color: var(--primary-color);">Note: Mobile browsers use manual import.</span>
+                    </p>
+                    
+                    <div class="setting-item">
+                        <span>Auto-Save to Linked Files</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoSync" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="action-grid" style="margin-top: 1rem;">
+                        <button id="linkKmlBtn" class="btn btn-secondary">
+                            <i class="fa-solid fa-file-code"></i> Link KML File
+                        </button>
+                        <button id="linkCsvBtn" class="btn btn-secondary">
+                            <i class="fa-solid fa-file-csv"></i> Link CSV File
+                        </button>
+                    </div>
+
+                    <div id="fileStatusContainer" style="margin-top: 1.5rem; display: none;">
+                        <div id="kmlFileStatus" class="sync-status" style="margin-bottom: 8px; font-size: 0.85em;">
+                            KML: Not Linked
+                        </div>
+                        <div id="csvFileStatus" class="sync-status" style="margin-bottom: 8px; font-size: 0.85em;">
+                            CSV: Not Linked
+                        </div>
+                        <button id="verifyFileAccessBtn" class="btn btn-primary" style="width: 100%; display: none; margin-top: 10px;">
+                            <i class="fa-solid fa-shield-check"></i> Re-verify File Access
+                        </button>
+                    </div>
                 </div>
 
                 <div class="settings-group">
@@ -425,6 +560,8 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <!-- SortableJS for Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Globe.GL for 3D Globe View -->
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
     <!-- App Logic -->
     <script src="script.js"></script>
 </body>
