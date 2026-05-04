@@ -154,6 +154,8 @@ body {
     z-index: 1;
 }
 
+
+
 .map-overlay-info {
     position: absolute;
     top: 1rem;
@@ -933,12 +935,48 @@ textarea:focus {
     }
 
     .main-header,
-    .map-section,
     .travel-mode-selector,
     .card-actions,
     .modal,
-    .add-location-btn {
+    .add-location-btn,
+    .grouping-toggle {
         display: none !important;
+    }
+
+    .print-only {
+        display: block !important;
+    }
+
+    .main-content {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .map-section {
+        display: block !important;
+        order: 2;
+        page-break-before: always;
+        page-break-inside: avoid;
+        height: 95vh !important;
+        width: 100% !important;
+        margin-top: 0;
+    }
+
+    body.dark-map-theme .leaflet-tile-pane {
+        filter: invert(1) hue-rotate(180deg) brightness(1.2) contrast(0.9) !important;
+    }
+
+    /* Ensure leaflet controls and unnecessary map UI elements are hidden */
+    .leaflet-control-container,
+    .map-overlay-info,
+    .map-travel-time,
+    .map-container.show-print-frame::after {
+        display: none !important;
+    }
+
+    .leaflet-container {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 
     .itinerary-section {
@@ -949,6 +987,7 @@ textarea:focus {
         overflow: visible !important;
         height: auto !important;
         display: block !important;
+        order: 1;
     }
 
     .itinerary-header {
@@ -1896,4 +1935,66 @@ input:checked+.slider:before {
 .sync-status.sync-loading {
     border-color: var(--primary-color);
     color: var(--primary-color);
+}
+
+/* Print Preview Frame overlay */
+.map-container.show-print-frame::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* Anchor to the top-left of the 210mm x 297mm print area */
+    margin-left: -105mm; 
+    margin-top: -148.5mm;
+    width: 190mm; /* 210mm - 20mm right margin */
+    height: 267mm; /* 297mm - 30mm bottom margin */
+    max-width: 95vw;
+    max-height: 95vh;
+    border: 3px dashed rgba(255, 0, 85, 0.8);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.map-container.show-print-frame::before {
+    content: 'A4';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -105mm;
+    margin-top: -148.5mm;
+    background: rgba(255, 0, 85, 0.8);
+    color: white;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 0 0 4px 0;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+.preview-svg {
+    width: 1.2rem;
+    height: 1.2rem;
+    fill: currentColor;
+    vertical-align: middle;
+}
+
+/* Full-width preview mode (removed itinerary hiding as it broke printing) */
+body.print-preview-mode .map-section {
+    /* We no longer hide itinerary so the map doesn't shift its center coordinate */
+}
+
+/* Force map to print dimensions just before print dialog opens */
+@media screen {
+    body.print-prep .map-section {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 210mm !important; /* Use exact A4 width for Leaflet calculations */
+        height: 297mm !important; /* Use exact A4 height */
+        z-index: 9999 !important;
+        display: block !important;
+        opacity: 0; 
+    }
 }

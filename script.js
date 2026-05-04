@@ -97,7 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function initMap() {
     // Default view (Europe)
     map = L.map('map', {
-        dragging: !L.Browser.mobile
+        dragging: !L.Browser.mobile,
+        zoomSnap: 0.1,
+        zoomDelta: 0.5,
+        wheelPxPerZoomLevel: 120
     }).setView([48.8566, 2.3522], 5);
 
     // Initialize with current theme
@@ -141,6 +144,8 @@ function setMapTheme(theme) {
             maxZoom: 20
         }).addTo(map);
     }
+    
+    document.body.classList.toggle('dark-map-theme', theme === 'dark');
 }
 
 // Toggle Theme
@@ -546,7 +551,8 @@ function showModalDayTripForm(editIndex = null) {
 }
 
 // Render Map Elements (Markers & Polyline)
-function renderMapElements() {
+function renderMapElements(overrideTheme) {
+    const theme = overrideTheme || currentTheme;
     // Clear existing
     markers.forEach(marker => map.removeLayer(marker));
     markers = [];
@@ -609,7 +615,7 @@ function renderMapElements() {
         // Build day trips HTML for popup
         let dayTripsPopupHTML = '';
         if (loc.dayTrips && loc.dayTrips.length > 0) {
-            dayTripsPopupHTML = `<p style="margin: 8px 0 4px 0; font-weight: bold; border-top: 1px solid #ddd; padding-top: 6px;">📍 Day Trips:</p>`;
+            dayTripsPopupHTML = `<p style="margin: 8px 0 4px 0; font-weight: bold; border-top: 1px solid #ddd; padding-top: 6px;">📍 Activities:</p>`;
             loc.dayTrips.forEach((trip, ti) => {
                 const subNum = `${activeCount}-${String(ti + 1).padStart(2, '0')}`;
                 dayTripsPopupHTML += `<p style="margin: 3px 0; font-size: 0.9em;"><strong>${subNum}</strong> ${trip.name}${trip.notes ? ` — ${trip.notes}` : ''}</p>`;
@@ -713,7 +719,7 @@ function renderMapElements() {
                             <h3 style="margin: 0 0 5px 0; color: #f59e0b; text-align: center;">
                                 <span style="font-size: 0.8em; opacity: 0.7;">${fullSubNum}</span> ${trip.name}
                             </h3>
-                            <p style="margin: 3px 0; font-size: 0.85em; color: #666; text-align: center;">Day trip from ${loc.name}</p>
+                            <p style="margin: 3px 0; font-size: 0.85em; color: #666; text-align: center;">Activity from ${loc.name}</p>
                             ${trip.notes ? `<p style="margin: 5px 0; font-size: 0.9em;">${trip.notes}</p>` : ''}
                         </div>
                     `);
@@ -722,7 +728,7 @@ function renderMapElements() {
 
                 // Draw dashed connector line from parent to day trip
                 if (!loc.hideDayTripLines) {
-                    const dtLineColor = currentTheme === 'light' ? '#d97706' : '#f59e0b';
+                    const dtLineColor = theme === 'light' ? '#d97706' : '#f59e0b';
                     const dtLine = L.polyline([[loc.lat, loc.lng], [trip.lat, trip.lng]], {
                         color: dtLineColor,
                         weight: 3,
@@ -738,7 +744,7 @@ function renderMapElements() {
 
     // Draw Polyline (Only for active locations)
     if (activeLocations.length > 1) {
-        const lineColor = currentTheme === 'light' ? '#000000' : '#00d2ff';
+        const lineColor = theme === 'light' ? '#000000' : '#00d2ff';
 
         // Add travel time labels at midpoints and draw line segments
         for (let i = 0; i < activeLocations.length - 1; i++) {
@@ -779,7 +785,7 @@ function renderMapElements() {
 
                 // Create custom icon for travel time label
                 // Use black text for light mode, white for dark mode
-                const textColor = currentTheme === 'light' ? '#000000' : '#f8fafc';
+                const textColor = theme === 'light' ? '#000000' : '#f8fafc';
 
                 // Get travel mode icon
                 const modeIcons = {
@@ -1879,6 +1885,32 @@ function deleteTagGlobally(tagName) {
 function renderItineraryList() {
     itineraryList.innerHTML = '';
 
+    // Calculate most frequent tag for title (weighted by activities)
+    let tagCounts = {};
+    locations.forEach(loc => {
+        if (loc.tags) {
+            let weight = 1 + (loc.dayTrips ? loc.dayTrips.length : 0);
+            loc.tags.split(',').forEach(tag => {
+                const t = tag.trim();
+                if (t) tagCounts[t] = (tagCounts[t] || 0) + weight;
+            });
+        }
+    });
+    
+    let topTag = '';
+    let maxCount = 0;
+    for (const [tag, count] of Object.entries(tagCounts)) {
+        if (count > maxCount) {
+            maxCount = count;
+            topTag = tag;
+        }
+    }
+    
+    const journeyTitle = document.querySelector('.itinerary-header h2');
+    if (journeyTitle) {
+        journeyTitle.textContent = topTag ? `${topTag} Trip` : 'Your Journey';
+    }
+
     if (locations.length === 0) {
         itineraryList.innerHTML = `
             <div class="empty-state">
@@ -2096,11 +2128,11 @@ function createLocationCard(loc, index, activeCount) {
                 ${activitiesHTML}
                 ${loc.kidsActivity ? `<div class="detail-row"><i class="fa-solid fa-child-reaching fa-fw" style="color: #ec4899;"></i> <span>Kids: ${loc.kidsActivity}</span></div>` : ''}
                 ${(() => {
-            // Day Trips Section
+            // Activities Section
             const trips = loc.dayTrips || [];
             let dtHTML = `<div class="day-trips-section ${trips.length === 0 ? 'empty-day-trips' : ''}">`;
             dtHTML += `<div class="day-trips-header" style="justify-content: space-between;">
-                                   <div style="display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-map-pin fa-fw" style="color: #f59e0b;"></i> Day Trips</div>
+                                   <div style="display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-map-pin fa-fw" style="color: #f59e0b;"></i> Activities</div>
                                    ${trips.length > 0 ? `
                                    <label class="grouping-toggle no-print" title="Toggle connector lines on map" style="margin: 0; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                                        <span style="font-size: 0.75rem;">Lines</span>
@@ -2129,7 +2161,7 @@ function createLocationCard(loc, index, activeCount) {
                             </div>`;
             });
             dtHTML += `</div>`;
-            dtHTML += `<button class="add-day-trip-btn no-print" onclick="event.stopPropagation(); addDayTrip('${loc.id}')"><i class="fa-solid fa-plus"></i> Add Day Trip</button>`;
+            dtHTML += `<button class="add-day-trip-btn no-print" onclick="event.stopPropagation(); addDayTrip('${loc.id}')"><i class="fa-solid fa-plus"></i> Add Activity</button>`;
             dtHTML += `</div>`;
             return dtHTML;
         })()}
@@ -2705,8 +2737,84 @@ function setupEventListeners() {
 
     // Export Button
     if (document.getElementById('printBtn')) {
-        document.getElementById('printBtn').addEventListener('click', () => window.print());
+        document.getElementById('printBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            if (map) {
+                const center = map.getCenter();
+                const originalTheme = currentTheme;
+                
+                // Force actual light mode for printing
+                setMapTheme('light');
+                renderMapElements('light'); // Re-render markers and lines with light theme colors
+                document.body.classList.add('print-prep');
+                
+                map.invalidateSize({pan: false});
+                map.setView(center, map.getZoom(), {animate: false});
+                
+                // Give tiles a moment to load before opening print dialog
+                setTimeout(() => {
+                    window.print();
+                    
+                    // Restore original theme and cleanup
+                    setMapTheme(originalTheme);
+                    renderMapElements(originalTheme); // Restore marker and line colors
+                    document.body.classList.remove('print-prep');
+                    map.invalidateSize();
+                }, 800);
+            } else {
+                window.print();
+            }
+        });
     }
+
+    if (document.getElementById('printFrameBtn')) {
+        document.getElementById('printFrameBtn').addEventListener('click', () => {
+            const mapContainer = document.querySelector('.map-container');
+            if (mapContainer) {
+                const isActive = mapContainer.classList.toggle('show-print-frame');
+                
+                // Toggle zoom sensitivity
+                if (isActive) {
+                    map.options.zoomSnap = 0.1;
+                    map.options.zoomDelta = 0.5;
+                    map.scrollWheelZoom.options.wheelPxPerZoomLevel = 120;
+                } else {
+                    map.options.zoomSnap = 1;
+                    map.options.zoomDelta = 1;
+                    map.scrollWheelZoom.options.wheelPxPerZoomLevel = 60;
+                }
+
+                // Trigger map resize so centering remains correct
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                }, 300);
+
+                const iconBtn = document.getElementById('printFrameBtn');
+                if (isActive) {
+                    iconBtn.style.color = '#ff0055'; // highlight when active
+                    iconBtn.title = "Exit Print Preview";
+                } else {
+                    iconBtn.style.color = '';
+                    iconBtn.title = "Toggle Print Preview Frame";
+                }
+            }
+        });
+    }
+
+    window.addEventListener('beforeprint', () => {
+        const dateSpan = document.getElementById('printDateValue');
+        if (dateSpan) {
+            const today = new Date();
+            dateSpan.textContent = today.toLocaleDateString();
+        }
+        if (map) {
+            map.invalidateSize();
+        }
+    });
+
+    window.addEventListener('afterprint', () => {
+        if (map) map.invalidateSize();
+    });
 
     // Settings Modal Logic
     const settingsBtn = document.getElementById('settingsBtn');
