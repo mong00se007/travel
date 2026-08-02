@@ -1,4 +1,146 @@
 console.log('SCRIPT LOADED: script.js');
+
+if (typeof AndroidBridge !== 'undefined') {
+    document.documentElement.classList.add('is-android-app');
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.body) document.body.classList.add('is-android-app');
+    });
+}
+
+// Android SMB client bridge wrapper
+window.AndroidSMB = {
+    callbacks: {},
+    callbackCounter: 0,
+    isAndroid: function () {
+        return typeof AndroidBridge !== 'undefined';
+    },
+    testConnection: function (server, share, path, username, password, domain) {
+        return new Promise((resolve, reject) => {
+            const callbackId = 'cb_' + (this.callbackCounter++);
+            this.callbacks[callbackId] = { resolve, reject };
+            AndroidBridge.testConnection(server, share, path, username, password, domain, callbackId);
+        });
+    },
+    pushFile: function (server, share, path, filename, content, username, password, domain) {
+        return new Promise((resolve, reject) => {
+            const callbackId = 'cb_' + (this.callbackCounter++);
+            this.callbacks[callbackId] = { resolve, reject };
+            AndroidBridge.pushFile(server, share, path, filename, content, username, password, domain, callbackId);
+        });
+    },
+    pullFile: function (server, share, path, filename, username, password, domain) {
+        return new Promise((resolve, reject) => {
+            const callbackId = 'cb_' + (this.callbackCounter++);
+            this.callbacks[callbackId] = { resolve, reject };
+            AndroidBridge.pullFile(server, share, path, filename, username, password, domain, callbackId);
+        });
+    },
+    getFileModifiedTime: function (server, share, path, filename, username, password, domain) {
+        return new Promise((resolve, reject) => {
+            const callbackId = 'cb_' + (this.callbackCounter++);
+            this.callbacks[callbackId] = { resolve, reject };
+            AndroidBridge.getFileModifiedTime(server, share, path, filename, username, password, domain, callbackId);
+        });
+    },
+    onResult: function (callbackId, success, resultOrError) {
+        const callback = this.callbacks[callbackId];
+        if (!callback) return;
+        delete this.callbacks[callbackId];
+        if (success) {
+            callback.resolve(resultOrError);
+        } else {
+            callback.reject(new Error(resultOrError));
+        }
+    }
+};
+
+// IndexedDB Card Image Cache Database Manager
+const DB_NAME = 'travel_planner_images_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'cached_images';
+let dbInstance = null;
+
+function getImageDB() {
+    return new Promise((resolve, reject) => {
+        if (dbInstance) return resolve(dbInstance);
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = function (e) {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        request.onsuccess = function (e) {
+            dbInstance = e.target.result;
+            resolve(dbInstance);
+        };
+        request.onerror = function (e) {
+            reject(e.target.error);
+        };
+    });
+}
+
+function getCachedImage(url) {
+    return getImageDB().then(db => {
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.get(url);
+            req.onsuccess = function () {
+                resolve(req.result || null);
+            };
+            req.onerror = function () {
+                resolve(null);
+            };
+        });
+    });
+}
+
+function setCachedImage(url, dataUrl) {
+    return getImageDB().then(db => {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.put(dataUrl, url);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    });
+}
+
+function applyCardImage(url, cardElement, locationId) {
+    if (!url || !url.startsWith('http')) return;
+
+    getCachedImage(url).then(cached => {
+        if (cached) {
+            const imgDiv = (cardElement && cardElement.querySelector) ? cardElement.querySelector('.card-image') : document.getElementById(`card-image-${locationId}`);
+            if (imgDiv) imgDiv.style.backgroundImage = `url('${cached}')`;
+        } else {
+            // Silently attempt background caching to IndexedDB if environment allows
+            fetch(url)
+                .then(res => {
+                    if (!res.ok) throw new Error('Fetch failed');
+                    return res.blob();
+                })
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = function () {
+                        const dataUrl = reader.result;
+                        setCachedImage(url, dataUrl).then(() => {
+                            const curEl = (cardElement && cardElement.querySelector) ? cardElement.querySelector('.card-image') : document.getElementById(`card-image-${locationId}`);
+                            if (curEl) curEl.style.backgroundImage = `url('${dataUrl}')`;
+                        }).catch(() => { });
+                    };
+                    reader.readAsDataURL(blob);
+                })
+                .catch(() => {
+                    // Suppress CORS fetch errors when running locally via file://
+                });
+        }
+    }).catch(() => { });
+}
+
+
 // State Management
 let locations = JSON.parse(localStorage.getItem('travel_planner_locations')) || [];
 let showRestaurants = localStorage.getItem('travel_planner_show_restaurants') !== 'false'; // Default true
@@ -20,19 +162,70 @@ let collapsedGroups = JSON.parse(localStorage.getItem('travel_planner_collapsed_
 let isTransitioning = false;
 let restaurants = JSON.parse(localStorage.getItem('travel_planner_restaurants')) || [];
 
-// Linked File State
-let autoSync = localStorage.getItem('travel_planner_auto_sync') !== 'false';
-let kmlFileHandle = null;
-let csvFileHandle = null;
+// Linked File State (Retired)
+let autoSync = false;
 
-// Network Sync State (WebDAV)
-let syncEnabled = localStorage.getItem('travel_planner_sync_enabled') === 'true';
+// Network Sync State (Retired)
+let syncEnabled = false;
 let syncUrl = localStorage.getItem('travel_planner_sync_url') || '';
 let kmlFileName = localStorage.getItem('travel_planner_kml_filename') || 'travel_planner_itinerary.kml';
 let csvFileName = localStorage.getItem('travel_planner_csv_filename') || 'restaurants.csv';
 let syncUsername = localStorage.getItem('travel_planner_sync_username') || '';
 let syncPassword = localStorage.getItem('travel_planner_sync_password') || '';
 let lastSyncTime = localStorage.getItem('travel_planner_last_sync_time') || 'Never';
+
+// SMB Sync State
+let smbEnabled = localStorage.getItem('travel_planner_smb_enabled') === 'true';
+let smbAutoSync = localStorage.getItem('travel_planner_smb_autosync') !== 'false';
+let smbServer = localStorage.getItem('travel_planner_smb_server') || '';
+let smbShare = localStorage.getItem('travel_planner_smb_share') || '';
+let smbPath = localStorage.getItem('travel_planner_smb_path') || '';
+let smbUsername = localStorage.getItem('travel_planner_smb_username') || '';
+let smbPassword = localStorage.getItem('travel_planner_smb_password') || '';
+let smbDomain = localStorage.getItem('travel_planner_smb_domain') || '';
+let smbLastModifiedKml = localStorage.getItem('travel_planner_smb_last_modified_kml') || '0';
+let smbLastModifiedCsv = localStorage.getItem('travel_planner_smb_last_modified_csv') || '0';
+let lastSmbSyncTime = localStorage.getItem('travel_planner_last_smb_sync_time') || 'Never';
+
+// Currency conversion & exchange rates
+let settingsCurrency = localStorage.getItem('travel_planner_settings_currency') || 'NZD';
+let exchangeRates = JSON.parse(localStorage.getItem('travel_planner_exchange_rates')) || {
+    "USD": 1,
+    "EUR": 0.92,
+    "NZD": 1.63,
+    "AUD": 1.51,
+    "GBP": 0.78,
+    "CAD": 1.36,
+    "JPY": 159.20,
+    "CHF": 0.89,
+    "ZAR": 18.25
+};
+
+async function fetchExchangeRates() {
+    const lastFetch = parseInt(localStorage.getItem('travel_planner_exchange_rates_fetched_time')) || 0;
+    const oneDay = 24 * 60 * 60 * 1000;
+    if (Date.now() - lastFetch < oneDay && Object.keys(exchangeRates).length > 5) {
+        console.log('Exchange rates are up to date (fetched within 24h).');
+        return;
+    }
+
+    try {
+        console.log('Fetching fresh exchange rates...');
+        const response = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        if (data && data.rates) {
+            exchangeRates = data.rates;
+            localStorage.setItem('travel_planner_exchange_rates', JSON.stringify(exchangeRates));
+            localStorage.setItem('travel_planner_exchange_rates_fetched_time', Date.now().toString());
+            console.log('Exchange rates updated successfully:', exchangeRates);
+        }
+    } catch (err) {
+        console.warn('Failed to fetch exchange rates, using cached/fallback rates:', err);
+    }
+}
+
+
 
 // DOM Elements (Initialized in DOMContentLoaded)
 let locationModal;
@@ -50,6 +243,7 @@ let importRestaurantsFile;
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App Initializing...');
+    fetchExchangeRates();
 
     // Initialize DOM Elements
     locationModal = document.getElementById('locationModal');
@@ -68,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     renderApp();
     setupEventListeners();
+    initMapResizer();
     setupDragAndDrop();
 
     // Load persisted restaurants
@@ -91,16 +286,42 @@ document.addEventListener('DOMContentLoaded', () => {
             renderApp();
         });
     }
+
+    // Show SMB Sync options if running on Android
+    if (window.AndroidSMB.isAndroid()) {
+        const smbGroup = document.getElementById('smbSettingsGroup');
+        if (smbGroup) smbGroup.style.display = 'block';
+
+        // Initial pull if enabled
+        if (smbEnabled) {
+            setTimeout(() => {
+                smbPullAll();
+            }, 1000);
+        }
+
+        // Periodic auto-update check
+        setInterval(smbCheckForUpdates, 15000); // Check every 15s
+
+        // Also check on window focus/visibilitychange
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                smbCheckForUpdates();
+            }
+        });
+    }
 });
 
 // Map Initialization
 function initMap() {
     // Default view (Europe)
     map = L.map('map', {
-        dragging: !L.Browser.mobile,
+        dragging: true,
+        tap: true,
+        touchZoom: true,
         zoomSnap: 0.1,
         zoomDelta: 0.5,
-        wheelPxPerZoomLevel: 120
+        wheelPxPerZoomLevel: 120,
+        attributionControl: false
     }).setView([48.8566, 2.3522], 5);
 
     // Initialize with current theme
@@ -144,7 +365,7 @@ function setMapTheme(theme) {
             maxZoom: 20
         }).addTo(map);
     }
-    
+
     document.body.classList.toggle('dark-map-theme', theme === 'dark');
 }
 
@@ -914,6 +1135,9 @@ function generateKML() {
         kml += `        <Data name="stayDateFrom"><value>${escapeXml(loc.stayDateFrom || '')}</value></Data>\n`;
         kml += `        <Data name="stayDateTo"><value>${escapeXml(loc.stayDateTo || '')}</value></Data>\n`;
         kml += `        <Data name="checkoutTime"><value>${escapeXml(loc.checkoutTime || '')}</value></Data>\n`;
+        kml += `        <Data name="stayPaid"><value>${escapeXml(loc.stayPaid || 'no')}</value></Data>\n`;
+        kml += `        <Data name="stayAmount"><value>${escapeXml(String(loc.stayAmount || ''))}</value></Data>\n`;
+        kml += `        <Data name="stayPaymentDate"><value>${escapeXml(loc.stayPaymentDate || '')}</value></Data>\n`;
         kml += `        <Data name="morningActivity"><value>${escapeXml(loc.activities?.morning || '')}</value></Data>\n`;
         kml += `        <Data name="afternoonActivity"><value>${escapeXml(loc.activities?.afternoon || '')}</value></Data>\n`;
         kml += `        <Data name="allDayActivity"><value>${escapeXml(loc.activities?.allDay || '')}</value></Data>\n`;
@@ -1204,6 +1428,100 @@ function updateSyncStatus(message, type) {
     }
 }
 
+async function smbPushAll() {
+    if (!smbEnabled || !window.AndroidSMB.isAndroid()) return;
+    updateSmbSyncStatus('Pushing data...', 'loading');
+    try {
+        const kmlContent = generateKML();
+        await window.AndroidSMB.pushFile(smbServer, smbShare, smbPath, kmlFileName, kmlContent, smbUsername, smbPassword, smbDomain);
+
+        // Push CSV too
+        const headersStr = 'name,location,star_rating,price,type,dedicated_gluten_free,gf_menu_items,review,lat,lng';
+        const rows = restaurants.map(r => `"${r.name}","${r.location}","${r.star_rating}","${r.price}","${r.type}","${r.dedicated_gluten_free}","${r.gf_menu_items}","${r.review}",${r.lat},${r.lng}`);
+        const csvContent = [headersStr, ...rows].join('\n');
+        await window.AndroidSMB.pushFile(smbServer, smbShare, smbPath, csvFileName, csvContent, smbUsername, smbPassword, smbDomain);
+
+        // Get new modified time to avoid triggering immediate pull
+        const kmlMod = await window.AndroidSMB.getFileModifiedTime(smbServer, smbShare, smbPath, kmlFileName, smbUsername, smbPassword, smbDomain);
+        const csvMod = await window.AndroidSMB.getFileModifiedTime(smbServer, smbShare, smbPath, csvFileName, smbUsername, smbPassword, smbDomain);
+        smbLastModifiedKml = parseInt(kmlMod) || Date.now();
+        smbLastModifiedCsv = parseInt(csvMod) || Date.now();
+        localStorage.setItem('travel_planner_smb_last_modified_kml', smbLastModifiedKml);
+        localStorage.setItem('travel_planner_smb_last_modified_csv', smbLastModifiedCsv);
+
+        lastSmbSyncTime = new Date().toLocaleTimeString();
+        localStorage.setItem('travel_planner_last_smb_sync_time', lastSmbSyncTime);
+        updateSmbSyncStatus('Synced to NAS!', 'success');
+    } catch (err) {
+        console.error('SMB Push Error:', err);
+        updateSmbSyncStatus(`Push Error: ${err.message}`, 'error');
+    }
+}
+
+async function smbPullAll() {
+    if (!smbEnabled || !window.AndroidSMB.isAndroid()) return;
+    updateSmbSyncStatus('Pulling data...', 'loading');
+    try {
+        // Pull KML
+        const kmlContent = await window.AndroidSMB.pullFile(smbServer, smbShare, smbPath, kmlFileName, smbUsername, smbPassword, smbDomain);
+        processKMLImport(kmlContent);
+
+        // Pull CSV
+        try {
+            const csvContent = await window.AndroidSMB.pullFile(smbServer, smbShare, smbPath, csvFileName, smbUsername, smbPassword, smbDomain);
+            processCSVImport(csvContent);
+        } catch (csvErr) {
+            console.warn('Could not pull CSV, it might not exist yet:', csvErr);
+        }
+
+        // Save last modified times
+        const kmlMod = await window.AndroidSMB.getFileModifiedTime(smbServer, smbShare, smbPath, kmlFileName, smbUsername, smbPassword, smbDomain);
+        const csvMod = await window.AndroidSMB.getFileModifiedTime(smbServer, smbShare, smbPath, csvFileName, smbUsername, smbPassword, smbDomain);
+        smbLastModifiedKml = parseInt(kmlMod) || 0;
+        smbLastModifiedCsv = parseInt(csvMod) || 0;
+        localStorage.setItem('travel_planner_smb_last_modified_kml', smbLastModifiedKml);
+        localStorage.setItem('travel_planner_smb_last_modified_csv', smbLastModifiedCsv);
+
+        lastSmbSyncTime = new Date().toLocaleTimeString();
+        localStorage.setItem('travel_planner_last_smb_sync_time', lastSmbSyncTime);
+        updateSmbSyncStatus('Loaded from NAS!', 'success');
+    } catch (err) {
+        console.error('SMB Pull Error:', err);
+        updateSmbSyncStatus(`Pull Error: ${err.message}`, 'error');
+    }
+}
+
+async function smbCheckForUpdates() {
+    if (!smbEnabled || !smbAutoSync || !window.AndroidSMB.isAndroid()) return;
+    try {
+        const kmlModStr = await window.AndroidSMB.getFileModifiedTime(smbServer, smbShare, smbPath, kmlFileName, smbUsername, smbPassword, smbDomain);
+        const remoteKmlMod = parseInt(kmlModStr) || 0;
+        if (remoteKmlMod > 0 && remoteKmlMod > smbLastModifiedKml) {
+            console.log(`SMB: Remote KML has updates (${remoteKmlMod} > ${smbLastModifiedKml}). Pulling...`);
+            await smbPullAll();
+        }
+    } catch (err) {
+        console.warn('SMB Auto-update check failed:', err);
+    }
+}
+
+function updateSmbSyncStatus(message, type) {
+    const statusEl = document.getElementById('smbSyncStatus');
+    if (!statusEl) return;
+    statusEl.innerText = `Status: ${message}`;
+    statusEl.className = 'sync-status'; // Reset classes
+    if (type === 'success') statusEl.classList.add('sync-success');
+    if (type === 'error') statusEl.classList.add('sync-error');
+    if (type === 'loading') statusEl.classList.add('sync-loading');
+
+    if (type === 'success') {
+        setTimeout(() => {
+            statusEl.innerText = `Status: Ready (Last: ${lastSmbSyncTime})`;
+            statusEl.className = 'sync-status';
+        }, 5000);
+    }
+}
+
 function updateFileStatusUI() {
     const container = document.getElementById('fileStatusContainer');
     const kmlStatus = document.getElementById('kmlFileStatus');
@@ -1294,6 +1612,9 @@ function processKMLImport(kmlText) {
             stayDateFrom: getData('stayDateFrom'),
             stayDateTo: getData('stayDateTo'),
             checkoutTime: getData('checkoutTime'),
+            stayPaid: getData('stayPaid') || 'no',
+            stayAmount: getData('stayAmount') ? parseFloat(getData('stayAmount')) : '',
+            stayPaymentDate: getData('stayPaymentDate'),
             activities: {
                 morning: getData('morningActivity'),
                 afternoon: getData('afternoonActivity'),
@@ -1667,6 +1988,9 @@ function importItinerary(event) {
                         stayDateFrom: getData('stayDateFrom'),
                         stayDateTo: getData('stayDateTo'),
                         checkoutTime: getData('checkoutTime'),
+                        stayPaid: getData('stayPaid') || 'no',
+                        stayAmount: getData('stayAmount') ? parseFloat(getData('stayAmount')) : '',
+                        stayPaymentDate: getData('stayPaymentDate'),
                         activities: {
                             morning: getData('morningActivity'),
                             afternoon: getData('afternoonActivity'),
@@ -1766,36 +2090,81 @@ function updateStats() {
 }
 
 function saveData() {
-    localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
-    localStorage.setItem('travel_planner_collapsed_groups', JSON.stringify(collapsedGroups));
-    localStorage.setItem('travel_planner_restaurants', JSON.stringify(restaurants));
+    try {
+        localStorage.setItem('travel_planner_locations', JSON.stringify(locations));
+        localStorage.setItem('travel_planner_collapsed_groups', JSON.stringify(collapsedGroups));
+        localStorage.setItem('travel_planner_restaurants', JSON.stringify(restaurants));
+        localStorage.setItem('travel_planner_settings_currency', settingsCurrency);
 
-    // Save Sync Settings
-    localStorage.setItem('travel_planner_auto_sync', autoSync);
-    localStorage.setItem('travel_planner_sync_enabled', syncEnabled);
-    localStorage.setItem('travel_planner_sync_url', syncUrl);
-    localStorage.setItem('travel_planner_kml_filename', kmlFileName);
-    localStorage.setItem('travel_planner_csv_filename', csvFileName);
-    localStorage.setItem('travel_planner_sync_username', syncUsername);
-    localStorage.setItem('travel_planner_sync_password', syncPassword);
+        // Save Sync Settings
+        localStorage.setItem('travel_planner_auto_sync', autoSync);
+        localStorage.setItem('travel_planner_sync_enabled', syncEnabled);
+        localStorage.setItem('travel_planner_sync_url', syncUrl);
+        localStorage.setItem('travel_planner_kml_filename', kmlFileName);
+        localStorage.setItem('travel_planner_csv_filename', csvFileName);
+        localStorage.setItem('travel_planner_sync_username', syncUsername);
+        localStorage.setItem('travel_planner_sync_password', syncPassword);
 
-    // Linked File Auto-Save
-    if (autoSync) {
-        autoSaveToFile('kml');
-        if (syncEnabled) {
-            syncKML('push');
+        // Save SMB Settings
+        localStorage.setItem('travel_planner_smb_enabled', smbEnabled);
+        localStorage.setItem('travel_planner_smb_autosync', smbAutoSync);
+        localStorage.setItem('travel_planner_smb_server', smbServer);
+        localStorage.setItem('travel_planner_smb_share', smbShare);
+        localStorage.setItem('travel_planner_smb_path', smbPath);
+        localStorage.setItem('travel_planner_smb_username', smbUsername);
+        localStorage.setItem('travel_planner_smb_password', smbPassword);
+        localStorage.setItem('travel_planner_smb_domain', smbDomain);
+        localStorage.setItem('travel_planner_smb_last_modified_kml', smbLastModifiedKml);
+        localStorage.setItem('travel_planner_smb_last_modified_csv', smbLastModifiedCsv);
+
+        // Linked File Auto-Save
+        if (autoSync) {
+            autoSaveToFile('kml');
+            if (syncEnabled) {
+                syncKML('push');
+            }
         }
+
+        // SMB Auto-Save
+        if (smbEnabled && smbAutoSync && window.AndroidSMB.isAndroid()) {
+            smbPushAll();
+        }
+    } catch (e) {
+        console.warn('Error in saveData:', e);
     }
 }
 
+function isGroupCollapsed(tagName) {
+    if (!tagName) return false;
+    const target = tagName.trim().toLowerCase();
+    return collapsedGroups.some(g => typeof g === 'string' && g.trim().toLowerCase() === target);
+}
+
 function toggleGroup(tagName) {
-    if (collapsedGroups.includes(tagName)) {
-        collapsedGroups = collapsedGroups.filter(g => g !== tagName);
+    if (!tagName) return;
+    const target = tagName.trim().toLowerCase();
+    const index = collapsedGroups.findIndex(g => typeof g === 'string' && g.trim().toLowerCase() === target);
+    const isNowCollapsed = index === -1;
+
+    if (index > -1) {
+        collapsedGroups = collapsedGroups.filter(g => typeof g === 'string' && g.trim().toLowerCase() !== target);
     } else {
-        collapsedGroups.push(tagName);
+        collapsedGroups.push(tagName.trim());
     }
+
     saveData();
-    renderItineraryList();
+
+    // Direct DOM update for instant collapse/expand
+    const headers = document.querySelectorAll('.group-header');
+    headers.forEach(header => {
+        if (header.dataset.tag && header.dataset.tag.trim().toLowerCase() === target) {
+            header.classList.toggle('collapsed', isNowCollapsed);
+            const content = header.nextElementSibling;
+            if (content && content.classList.contains('group-content')) {
+                content.style.display = isNowCollapsed ? 'none' : 'flex';
+            }
+        }
+    });
 }
 
 function updateTagSuggestions() {
@@ -1896,7 +2265,7 @@ function renderItineraryList() {
             });
         }
     });
-    
+
     let topTag = '';
     let maxCount = 0;
     for (const [tag, count] of Object.entries(tagCounts)) {
@@ -1905,10 +2274,15 @@ function renderItineraryList() {
             topTag = tag;
         }
     }
-    
+
     const journeyTitle = document.querySelector('.itinerary-header h2');
     if (journeyTitle) {
         journeyTitle.textContent = topTag ? `${topTag} Trip` : 'Your Journey';
+    }
+
+    const mapOverlay = document.querySelector('.map-overlay-info');
+    if (mapOverlay) {
+        mapOverlay.style.display = locations.length === 0 ? 'block' : 'none';
     }
 
     if (locations.length === 0) {
@@ -1972,14 +2346,55 @@ function renderGroupedList() {
 
     sortedGroupNames.forEach(tagName => {
         const groupLocations = groups[tagName];
-        const isCollapsed = collapsedGroups.includes(tagName);
+        const isCollapsed = isGroupCollapsed(tagName);
 
         const header = document.createElement('div');
         header.className = `group-header ${isCollapsed ? 'collapsed' : ''}`;
+        header.dataset.tag = tagName;
+
+        // Calculate total days for locations in this group (accounting for multiple separate visits)
+        const activeLocations = locations.filter(l => !l.disabled);
+        let groupDays = 0;
+        groupLocations.forEach(loc => {
+            if (!loc.disabled) {
+                if (loc.stayDateFrom && loc.stayDateTo) {
+                    const from = new Date(loc.stayDateFrom);
+                    const to = new Date(loc.stayDateTo);
+                    const diff = Math.round((to - from) / (1000 * 60 * 60 * 24));
+                    if (!isNaN(diff) && diff > 0) {
+                        groupDays += diff;
+                        return;
+                    }
+                }
+                if (loc.stopDate) {
+                    const idx = activeLocations.findIndex(l => l.id === loc.id);
+                    if (idx >= 0 && idx < activeLocations.length - 1) {
+                        const nextLoc = activeLocations[idx + 1];
+                        if (nextLoc.stopDate) {
+                            const cur = new Date(loc.stopDate);
+                            const next = new Date(nextLoc.stopDate);
+                            const diff = Math.round((next - cur) / (1000 * 60 * 60 * 24));
+                            if (!isNaN(diff) && diff > 0) {
+                                groupDays += diff;
+                                return;
+                            }
+                        }
+                    }
+                }
+                groupDays += 1;
+            }
+        });
+
+        let dayCountHTML = '';
+        if (groupDays > 0) {
+            dayCountHTML = `<span class="group-day-count">${groupDays} day${groupDays !== 1 ? 's' : ''}</span>`;
+        }
+
         header.innerHTML = `
             <h4><i class="fa-solid fa-tag"></i> ${tagName}</h4>
             <div style="flex-grow: 1;"></div>
             <div style="display: flex; align-items: center; gap: 0.8rem;">
+                ${dayCountHTML}
                 <span class="group-count">${groupLocations.length} items</span>
                 <i class="fa-solid fa-chevron-down"></i>
             </div>
@@ -1994,6 +2409,11 @@ function renderGroupedList() {
 
         const content = document.createElement('div');
         content.className = 'group-content';
+        if (isCollapsed) {
+            content.style.display = 'none';
+        } else {
+            content.style.display = 'flex';
+        }
 
         groupLocations.forEach(loc => {
             const globalActiveCount = activeIndices.get(loc.id) || 0;
@@ -2022,7 +2442,7 @@ function createLocationCard(loc, index, activeCount) {
         displayNumber = activeCount + 1;
     }
 
-    const bgImage = loc.imageUrl || 'https://github.com/mong00se007/travel/raw/main/images/default.png';
+    const bgImage = loc.imageUrl || 'default.png';
 
     // Build activities HTML
     let activitiesHTML = '';
@@ -2067,7 +2487,7 @@ function createLocationCard(loc, index, activeCount) {
     }
 
     card.innerHTML = `
-        <div class="card-image" style="background-image: url('${bgImage}')">
+        <div class="card-image" id="card-image-${loc.id}" style="background-image: url('${bgImage}');">
             <div class="card-header-overlay">
                 ${!loc.disabled ? `<div class="card-number">${displayNumber}</div>` : ''}
                 <h3 class="card-title">${loc.name}</h3>
@@ -2083,10 +2503,10 @@ function createLocationCard(loc, index, activeCount) {
             </div>
             <div class="card-actions">
                 <button class="card-action-btn mobile-move-up" onclick="event.stopPropagation(); moveCard('${loc.id}', 'up')" title="Move Up">
-                    <i class="fa-solid fa-chevron-up"></i>
+                    <i class="fa-solid fa-arrow-up"></i>
                 </button>
                 <button class="card-action-btn mobile-move-down" onclick="event.stopPropagation(); moveCard('${loc.id}', 'down')" title="Move Down">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-arrow-down"></i>
                 </button>
                 <button class="card-action-btn disable" onclick="event.stopPropagation(); toggleDisable('${loc.id}')" title="${loc.disabled ? 'Enable' : 'Disable'}">
                     <i class="fa-solid ${loc.disabled ? 'fa-eye' : 'fa-eye-slash'}"></i>
@@ -2096,6 +2516,9 @@ function createLocationCard(loc, index, activeCount) {
                 </button>
                 <button class="card-action-btn delete" onclick="event.stopPropagation(); deleteLocation('${loc.id}')" title="Delete">
                     <i class="fa-solid fa-trash"></i>
+                </button>
+                <button class="card-action-btn card-expand-btn" onclick="event.stopPropagation(); toggleCardExpand('${loc.id}')" title="Expand / Collapse Details">
+                    <i class="fa-solid fa-chevron-down"></i>
                 </button>
             </div>
         </div>
@@ -2145,12 +2568,27 @@ function createLocationCard(loc, index, activeCount) {
             dtHTML += `<div class="day-trips-list">`;
             trips.forEach((trip, ti) => {
                 const subNum = String(ti + 1).padStart(2, '0');
+
+                // Render QR code thumbnails if present
+                let qrHTML = '';
+                if (trip.qrCodes && trip.qrCodes.length > 0) {
+                    qrHTML = `<div class="qr-thumbnails">`;
+                    trip.qrCodes.forEach((qr, qidx) => {
+                        qrHTML += `<img src="${qr.dataUrl}" class="qr-thumb" title="${qr.name || 'QR Code'}" onclick="event.stopPropagation(); openQRViewer(locations.find(l => l.id==='${loc.id}').dayTrips[${ti}].qrCodes, ${qidx})">`;
+                    });
+                    qrHTML += `<button class="add-qr-btn" onclick="event.stopPropagation(); addQRToCardTrip('${loc.id}', '${trip.id}')" title="Add QR Code"><i class="fa-solid fa-qrcode"></i></button>`;
+                    qrHTML += `</div>`;
+                } else {
+                    qrHTML = `<div class="qr-thumbnails"><button class="add-qr-btn" onclick="event.stopPropagation(); addQRToCardTrip('${loc.id}', '${trip.id}')" title="Add QR Code"><i class="fa-solid fa-qrcode"></i></button></div>`;
+                }
+
                 dtHTML += `
                             <div class="day-trip-item" data-trip-id="${trip.id}">
                                 <div class="day-trip-number"><span class="no-print">${displayNumber}-</span>${subNum}</div>
                                 <div class="day-trip-info">
                                     <div class="day-trip-name">${trip.name}</div>
                                     ${trip.notes ? `<div class="day-trip-notes">${trip.notes}</div>` : ''}
+                                    ${qrHTML}
                                 </div>
                                 <div class="day-trip-actions no-print">
                                     <button class="day-trip-action-btn edit" onclick="event.stopPropagation(); addDayTrip('${loc.id}', '${trip.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -2167,7 +2605,7 @@ function createLocationCard(loc, index, activeCount) {
         })()}
                 ${loc.food && loc.food.breakfast ? `<div class="detail-row"><i class="fa-solid fa-mug-hot fa-fw" style="color: #eab308;"></i> <span><strong>Breakfast:</strong> ${loc.food.breakfast}</span></div>` : ''}
                 ${loc.food && loc.food.lunch ? `<div class="detail-row"><i class="fa-solid fa-burger fa-fw" style="color: #eab308;"></i> <span><strong>Lunch:</strong> ${loc.food.lunch}</span></div>` : ''}
-                ${loc.food && loc.food.dinner ? `<div class="detail-row"><i class="fa-solid fa-utensils fa-fw" style="color: #eab308;"></i> <span><strong>Dinner:</strong> ${loc.food.dinner}</span></div>` : ''}
+                ${loc.food && loc.food.dinner ? `<div class="detail-row"><i class="fa-solid fa-utensils fa-fw" style="color: #eab308;"></i> <span>Dinner: ${loc.food.dinner}</span></div>` : ''}
                 ${loc.foodOptions ? `<div class="detail-row"><i class="fa-solid fa-utensils fa-fw" style="color: #eab308;"></i> <span>Food: ${loc.foodOptions}</span></div>` : ''}
                 ${loc.funFact ? `<div class="fun-fact"><i class="fa-solid fa-lightbulb fa-fw" style="color: #f59e0b; margin-right: 5px;"></i> ${loc.funFact}</div>` : ''}
                 ${loc.phrases ? `<div class="phrases-section"><strong><i class="fa-solid fa-language fa-fw" style="color: #10b981;"></i> Phrases:</strong> ${loc.phrases}</div>` : ''}
@@ -2177,12 +2615,17 @@ function createLocationCard(loc, index, activeCount) {
     `;
 
     // Fetch weather
-    fetchWeather(loc.lat, loc.lng, `weather-${loc.id}`);
+    fetchWeather(loc.lat, loc.lng, `weather-${loc.id}`, loc.id);
 
     // Add click handler
     card.addEventListener('click', function (e) {
         if (e.target.closest('.card-action-btn')) return;
         this.classList.toggle('expanded');
+        const isExpanded = this.classList.contains('expanded');
+        const expandBtn = this.querySelector('.card-expand-btn i');
+        if (expandBtn) {
+            expandBtn.className = `fa-solid ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`;
+        }
 
         if (globeView && globeInstance) {
             // If in globe view, fly there first then transition to map
@@ -2197,6 +2640,9 @@ function createLocationCard(loc, index, activeCount) {
             map.setView([loc.lat, loc.lng], 10, { animate: true });
         }
     });
+
+    // Apply cached background image asynchronously
+    applyCardImage(bgImage, card, loc.id);
 
     return card;
 }
@@ -2272,6 +2718,16 @@ function openModal(editId = null) {
         document.getElementById('stayDateFrom').value = loc.stayDateFrom || '';
         document.getElementById('stayDateTo').value = loc.stayDateTo || '';
         document.getElementById('checkoutTime').value = loc.checkoutTime || '';
+        document.getElementById('stayPaid').checked = (loc.stayPaid === 'yes');
+        document.getElementById('stayAmount').value = loc.stayAmount || '';
+        document.getElementById('stayCurrency').value = loc.stayCurrency || 'NZD';
+        document.getElementById('stayPaymentDate').value = loc.stayPaymentDate || '';
+        // Sync the Paid? label
+        const paidLbl = document.getElementById('stayPaidLabel');
+        if (paidLbl) {
+            paidLbl.textContent = (loc.stayPaid === 'yes') ? 'Yes' : 'No';
+            paidLbl.style.color = (loc.stayPaid === 'yes') ? '#10b981' : '';
+        }
 
         document.getElementById('morningActivity').value = loc.activities?.morning || '';
         document.getElementById('afternoonActivity').value = loc.activities?.afternoon || '';
@@ -2294,6 +2750,7 @@ function openModal(editId = null) {
         // Add Mode
         document.getElementById('modalTitle').innerText = 'Add Location';
         locationForm.reset();
+        if (document.getElementById('stayCurrency')) document.getElementById('stayCurrency').value = 'NZD';
         if (locationSearch) locationSearch.value = ''; // Clear search
         document.getElementById('locationId').value = '';
         if (tempClickCoords) {
@@ -2618,6 +3075,134 @@ function updateSortableState() {
 
 // Event Listeners
 function setupEventListeners() {
+    // Grouping Toggle
+    const toggleGrouping = document.getElementById('toggleGrouping');
+    if (toggleGrouping) {
+        toggleGrouping.checked = groupingEnabled;
+        toggleGrouping.addEventListener('change', (e) => {
+            groupingEnabled = e.target.checked;
+            localStorage.setItem('travel_planner_grouping_enabled', groupingEnabled);
+            updateSortableState();
+            renderItineraryList();
+        });
+    }
+
+function initMapResizer() {
+    const resizerHandle = document.getElementById('mapResizerHandle');
+    const mapSection = document.querySelector('.map-section');
+    const itinerarySection = document.querySelector('.itinerary-section');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!resizerHandle || !mapSection || !itinerarySection || !mainContent) return;
+
+    function applyMapResize(percent) {
+        const isMobile = window.innerWidth <= 768;
+        percent = Math.max(15, Math.min(85, percent));
+
+        if (isMobile) {
+            mapSection.style.setProperty('height', `${percent}%`, 'important');
+            mapSection.style.setProperty('width', '100%', 'important');
+            mapSection.style.setProperty('flex', 'none', 'important');
+            itinerarySection.style.setProperty('width', '100%', 'important');
+            itinerarySection.style.setProperty('flex', '1', 'important');
+            localStorage.setItem('travel_planner_map_height_percent', percent);
+        } else {
+            mapSection.style.setProperty('width', `${percent}%`, 'important');
+            mapSection.style.setProperty('flex', `0 0 ${percent}%`, 'important');
+            mapSection.style.setProperty('height', '100%', 'important');
+            itinerarySection.style.setProperty('height', '100%', 'important');
+            itinerarySection.style.setProperty('flex', '1', 'important');
+            localStorage.setItem('travel_planner_map_width_percent', percent);
+        }
+
+        if (map) {
+            map.invalidateSize();
+            setTimeout(() => map.invalidateSize(), 50);
+        }
+    }
+
+    function loadSavedResize() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            const savedHeight = localStorage.getItem('travel_planner_map_height_percent') || 40;
+            applyMapResize(parseFloat(savedHeight));
+        } else {
+            const savedWidth = localStorage.getItem('travel_planner_map_width_percent') || 50;
+            applyMapResize(parseFloat(savedWidth));
+        }
+    }
+
+    // Load initial saved size
+    loadSavedResize();
+
+    window.addEventListener('resize', debounce(() => {
+        if (!window.isResizingMap) loadSavedResize();
+    }, 200));
+
+    window.isResizingMap = false;
+    let startX, startY, startSize;
+
+    const startResizing = (e) => {
+        window.isResizingMap = true;
+        document.body.style.userSelect = 'none';
+        resizerHandle.classList.add('active');
+        if (mapSection) mapSection.style.pointerEvents = 'none';
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        startX = clientX;
+        startY = clientY;
+
+        const rect = mainContent.getBoundingClientRect();
+        const mapRect = mapSection.getBoundingClientRect();
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            startSize = (mapRect.height / rect.height) * 100;
+        } else {
+            startSize = (mapRect.width / rect.width) * 100;
+        }
+    };
+
+    const stopResizing = () => {
+        if (window.isResizingMap) {
+            window.isResizingMap = false;
+            document.body.style.userSelect = '';
+            if (mapSection) mapSection.style.pointerEvents = '';
+            resizerHandle.classList.remove('active');
+            if (map) map.invalidateSize();
+        }
+    };
+
+    const resize = (e) => {
+        if (!window.isResizingMap) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = mainContent.getBoundingClientRect();
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            const deltaY = clientY - startY;
+            const percentDelta = (deltaY / rect.height) * 100;
+            applyMapResize(startSize + percentDelta);
+        } else {
+            const deltaX = clientX - startX;
+            const percentDelta = (deltaX / rect.width) * 100;
+            applyMapResize(startSize + percentDelta);
+        }
+    };
+
+    resizerHandle.addEventListener('mousedown', startResizing);
+    resizerHandle.addEventListener('touchstart', startResizing, { passive: true });
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('touchmove', resize, { passive: false });
+    window.addEventListener('mouseup', stopResizing);
+    window.addEventListener('touchend', stopResizing);
+}
+initMapResizer();
+window.initMapResizer = initMapResizer;
+
     // Modal Close Buttons
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', closeModal);
@@ -2647,6 +3232,10 @@ function setupEventListeners() {
             stayDateFrom: document.getElementById('stayDateFrom').value,
             stayDateTo: document.getElementById('stayDateTo').value,
             checkoutTime: document.getElementById('checkoutTime').value,
+            stayPaid: document.getElementById('stayPaid').checked ? 'yes' : 'no',
+            stayAmount: document.getElementById('stayAmount').value ? parseFloat(document.getElementById('stayAmount').value) : '',
+            stayCurrency: document.getElementById('stayCurrency').value || 'NZD',
+            stayPaymentDate: document.getElementById('stayPaymentDate').value,
 
             activities: {
                 morning: document.getElementById('morningActivity').value,
@@ -2739,22 +3328,27 @@ function setupEventListeners() {
     if (document.getElementById('printBtn')) {
         document.getElementById('printBtn').addEventListener('click', (e) => {
             e.preventDefault();
+            generateBookingsPrintSection();
             if (map) {
                 const center = map.getCenter();
                 const originalTheme = currentTheme;
-                
+
                 // Force actual light mode for printing
                 setMapTheme('light');
                 renderMapElements('light'); // Re-render markers and lines with light theme colors
                 document.body.classList.add('print-prep');
-                
-                map.invalidateSize({pan: false});
-                map.setView(center, map.getZoom(), {animate: false});
-                
+
+                map.invalidateSize({ pan: false });
+                map.setView(center, map.getZoom(), { animate: false });
+
                 // Give tiles a moment to load before opening print dialog
                 setTimeout(() => {
-                    window.print();
-                    
+                    if (window.AndroidSMB.isAndroid()) {
+                        AndroidBridge.print();
+                    } else {
+                        window.print();
+                    }
+
                     // Restore original theme and cleanup
                     setMapTheme(originalTheme);
                     renderMapElements(originalTheme); // Restore marker and line colors
@@ -2762,7 +3356,11 @@ function setupEventListeners() {
                     map.invalidateSize();
                 }, 800);
             } else {
-                window.print();
+                if (window.AndroidSMB.isAndroid()) {
+                    AndroidBridge.print();
+                } else {
+                    window.print();
+                }
             }
         });
     }
@@ -2772,7 +3370,7 @@ function setupEventListeners() {
             const mapContainer = document.querySelector('.map-container');
             if (mapContainer) {
                 const isActive = mapContainer.classList.toggle('show-print-frame');
-                
+
                 // Toggle zoom sensitivity
                 if (isActive) {
                     map.options.zoomSnap = 0.1;
@@ -2786,7 +3384,10 @@ function setupEventListeners() {
 
                 // Trigger map resize so centering remains correct
                 setTimeout(() => {
-                    if (map) map.invalidateSize();
+                    if (map) {
+                        map.invalidateSize();
+                        updatePrintFrameScale();
+                    }
                 }, 300);
 
                 const iconBtn = document.getElementById('printFrameBtn');
@@ -2810,10 +3411,14 @@ function setupEventListeners() {
         if (map) {
             map.invalidateSize();
         }
+        // Generate Bookings print section
+        generateBookingsPrintSection();
     });
 
     window.addEventListener('afterprint', () => {
         if (map) map.invalidateSize();
+        const printSection = document.getElementById('bookingsPrintSection');
+        if (printSection) printSection.style.display = 'none';
     });
 
     // Settings Modal Logic
@@ -2847,6 +3452,18 @@ function setupEventListeners() {
             if (document.getElementById('syncUsername')) document.getElementById('syncUsername').value = syncUsername;
             if (document.getElementById('syncPassword')) document.getElementById('syncPassword').value = syncPassword;
             if (document.getElementById('syncStatus')) document.getElementById('syncStatus').innerText = `Status: ${syncEnabled ? 'Ready (Last: ' + lastSyncTime + ')' : 'Local Mode'}`;
+
+            // Sync SMB Settings UI
+            if (document.getElementById('smbEnabled')) document.getElementById('smbEnabled').checked = smbEnabled;
+            if (document.getElementById('smbAutoSync')) document.getElementById('smbAutoSync').checked = smbAutoSync;
+            if (document.getElementById('smbServer')) document.getElementById('smbServer').value = smbServer;
+            if (document.getElementById('smbShare')) document.getElementById('smbShare').value = smbShare;
+            if (document.getElementById('smbPath')) document.getElementById('smbPath').value = smbPath;
+            if (document.getElementById('smbUsername')) document.getElementById('smbUsername').value = smbUsername;
+            if (document.getElementById('smbPassword')) document.getElementById('smbPassword').value = smbPassword;
+            if (document.getElementById('smbDomain')) document.getElementById('smbDomain').value = smbDomain;
+            if (document.getElementById('smbSyncStatus')) document.getElementById('smbSyncStatus').innerText = `Status: ${smbEnabled ? 'Ready (Last: ' + lastSmbSyncTime + ')' : 'Local Mode'}`;
+            if (document.getElementById('settingsCurrency')) document.getElementById('settingsCurrency').value = settingsCurrency;
         });
 
         if (closeSettingsModal) {
@@ -2875,6 +3492,7 @@ function setupEventListeners() {
             modalResetBtn.addEventListener('click', () => {
                 if (confirm('Are you sure you want to clear your itinerary and all imported restaurants? This cannot be undone.')) {
                     locations = [];
+                    restaurants = []; // Clear restaurants too!
                     // Clear restaurants
                     restaurantMarkers.forEach(m => map.removeLayer(m));
                     restaurantMarkers = [];
@@ -2883,6 +3501,12 @@ function setupEventListeners() {
                     supermarketMarkers = [];
                     // Clear geocode queue
                     geocodeQueue.length = 0;
+
+                    // Clear IndexedDB Cache
+                    getDB().then(db => {
+                        const tx = db.transaction(STORE_NAME, 'readwrite');
+                        tx.objectStore(STORE_NAME).clear();
+                    }).catch(console.error);
 
                     renderApp();
                     renderMapElements();
@@ -2914,6 +3538,13 @@ function setupEventListeners() {
         }
 
         // Sync Event Listeners
+        if (document.getElementById('settingsCurrency')) {
+            document.getElementById('settingsCurrency').addEventListener('change', (e) => {
+                settingsCurrency = e.target.value;
+                localStorage.setItem('travel_planner_settings_currency', settingsCurrency);
+                saveData();
+            });
+        }
         if (document.getElementById('syncEnabled')) {
             document.getElementById('syncEnabled').addEventListener('change', (e) => {
                 syncEnabled = e.target.checked;
@@ -2962,6 +3593,116 @@ function setupEventListeners() {
         if (document.getElementById('pushKmlBtn')) document.getElementById('pushKmlBtn').addEventListener('click', () => syncKML('push'));
         if (document.getElementById('pullCsvBtn')) document.getElementById('pullCsvBtn').addEventListener('click', () => syncCSV('pull'));
         if (document.getElementById('pushCsvBtn')) document.getElementById('pushCsvBtn').addEventListener('click', () => syncCSV('push'));
+
+        // SMB Sync Event Listeners
+        if (document.getElementById('smbEnabled')) {
+            document.getElementById('smbEnabled').addEventListener('change', (e) => {
+                smbEnabled = e.target.checked;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbAutoSync')) {
+            document.getElementById('smbAutoSync').addEventListener('change', (e) => {
+                smbAutoSync = e.target.checked;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbServer')) {
+            document.getElementById('smbServer').addEventListener('input', (e) => {
+                smbServer = e.target.value;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbShare')) {
+            document.getElementById('smbShare').addEventListener('input', (e) => {
+                smbShare = e.target.value;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbPath')) {
+            document.getElementById('smbPath').addEventListener('input', (e) => {
+                smbPath = e.target.value;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbUsername')) {
+            document.getElementById('smbUsername').addEventListener('input', (e) => {
+                smbUsername = e.target.value;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbPassword')) {
+            document.getElementById('smbPassword').addEventListener('input', (e) => {
+                smbPassword = e.target.value;
+                saveData();
+            });
+        }
+        if (document.getElementById('smbDomain')) {
+            document.getElementById('smbDomain').addEventListener('input', (e) => {
+                smbDomain = e.target.value;
+                saveData();
+            });
+        }
+
+        // SMB Sync Action Buttons
+        if (document.getElementById('smbTestBtn')) {
+            document.getElementById('smbTestBtn').addEventListener('click', async () => {
+                if (!window.AndroidSMB.isAndroid()) {
+                    alert('SMB Sync is only available in the Android App.');
+                    return;
+                }
+                updateSmbSyncStatus('Testing connection...', 'loading');
+                try {
+                    const result = await window.AndroidSMB.testConnection(smbServer, smbShare, smbPath, smbUsername, smbPassword, smbDomain);
+                    alert(result);
+                    updateSmbSyncStatus('Connection OK!', 'success');
+                } catch (err) {
+                    alert('Connection failed: ' + err.message);
+                    updateSmbSyncStatus('Connection Failed', 'error');
+                }
+            });
+        }
+        if (document.getElementById('smbPullBtn')) {
+            document.getElementById('smbPullBtn').addEventListener('click', () => {
+                if (!window.AndroidSMB.isAndroid()) {
+                    alert('SMB Sync is only available in the Android App.');
+                    return;
+                }
+                smbPullAll();
+            });
+        }
+        if (document.getElementById('smbPushBtn')) {
+            document.getElementById('smbPushBtn').addEventListener('click', () => {
+                if (!window.AndroidSMB.isAndroid()) {
+                    alert('SMB Sync is only available in the Android App.');
+                    return;
+                }
+                smbPushAll();
+            });
+        }
+    }
+
+    // Bookings Modal Logic
+    const bookingsBtn = document.getElementById('bookingsBtn');
+    const bookingsModal = document.getElementById('bookingsModal');
+    const closeBookingsModal = document.getElementById('closeBookingsModal');
+    const bookingsModalBody = document.getElementById('bookingsModalBody');
+
+    if (bookingsBtn && bookingsModal && bookingsModalBody) {
+        bookingsBtn.addEventListener('click', () => {
+            bookingsModalBody.innerHTML = generateBookingsHTML();
+            bookingsModal.classList.add('active');
+        });
+
+        if (closeBookingsModal) {
+            closeBookingsModal.addEventListener('click', () => {
+                bookingsModal.classList.remove('active');
+            });
+        }
+
+        bookingsModal.addEventListener('click', (e) => {
+            if (e.target === bookingsModal) bookingsModal.classList.remove('active');
+        });
     }
 
     // Settings File Inputs
@@ -2983,18 +3724,28 @@ function setupEventListeners() {
         });
     }
 
-    // Event Delegation for Edit/Delete buttons in Itinerary List
+    // Event Delegation for Itinerary List (Group headers & Card buttons)
     itineraryList.addEventListener('click', (e) => {
+        const groupHeader = e.target.closest('.group-header');
+        if (groupHeader) {
+            const tagName = groupHeader.dataset.tag;
+            if (tagName) toggleGroup(tagName);
+            return;
+        }
+
         const btn = e.target.closest('.card-action-btn');
         if (!btn) return;
 
         const card = btn.closest('.location-card');
+        if (!card) return;
         const id = card.dataset.id;
 
         if (btn.classList.contains('edit')) {
             editLocation(id);
         } else if (btn.classList.contains('delete')) {
             deleteLocation(id);
+        } else if (btn.classList.contains('card-expand-btn') || btn.classList.contains('expand-toggle')) {
+            toggleCardExpand(id);
         }
     });
 
@@ -3071,6 +3822,16 @@ function setupEventListeners() {
         stayDateTo.addEventListener('change', updateNightsDisplay);
     }
 
+    // Paid? checkbox label update
+    const stayPaidCheckbox = document.getElementById('stayPaid');
+    const stayPaidLabel = document.getElementById('stayPaidLabel');
+    if (stayPaidCheckbox && stayPaidLabel) {
+        stayPaidCheckbox.addEventListener('change', () => {
+            stayPaidLabel.textContent = stayPaidCheckbox.checked ? 'Yes' : 'No';
+            stayPaidLabel.style.color = stayPaidCheckbox.checked ? '#10b981' : '';
+        });
+    }
+
     // Stay Address Search Listener
     const stayAddressInput = document.getElementById('stayAddress');
     if (stayAddressInput) {
@@ -3133,10 +3894,57 @@ function editLocation(id) {
     openModal(id);
 }
 
+function toggleCardExpand(id) {
+    const card = document.querySelector(`.location-card[data-id="${id}"]`);
+    if (!card) return;
+    card.classList.toggle('expanded');
+    const isExpanded = card.classList.contains('expanded');
+    const expandBtn = card.querySelector('.card-expand-btn i');
+    if (expandBtn) {
+        expandBtn.className = `fa-solid ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`;
+    }
+}
+
+// Weather Cache — persisted in localStorage, refreshed hourly
+const WEATHER_CACHE_KEY = 'travel_planner_weather_cache';
+const WEATHER_CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
+let weatherCache = (() => {
+    try {
+        return JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY)) || {};
+    } catch (e) {
+        return {};
+    }
+})();
+
+function saveWeatherCache() {
+    try {
+        localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(weatherCache));
+    } catch (e) {
+        console.warn('Could not save weather cache:', e);
+    }
+}
+
 // Weather Functions
-async function fetchWeather(lat, lng, elementId) {
+async function fetchWeather(lat, lng, elementId, locationId) {
+    const cached = weatherCache[locationId];
+    const now = Date.now();
+
+    // If cached weather exists, display it immediately regardless of age
+    if (cached && cached.temp !== undefined) {
+        const weatherEl = document.getElementById(elementId);
+        if (weatherEl) {
+            weatherEl.style.display = '';
+            weatherEl.innerHTML = `<i class="${cached.iconClass || 'fa-solid fa-cloud'}"></i> ${cached.temp}°C`;
+        }
+        // If fresh (under 1h), skip re-fetching
+        if (cached.fetchedAt && (now - cached.fetchedAt) < WEATHER_CACHE_TTL) {
+            return;
+        }
+    }
+
     try {
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        if (!response.ok) throw new Error('Weather API response error');
         const data = await response.json();
 
         if (data.current_weather) {
@@ -3144,16 +3952,667 @@ async function fetchWeather(lat, lng, elementId) {
             const code = data.current_weather.weathercode;
             const iconClass = getWeatherIcon(code);
 
+            weatherCache[locationId] = { temp, iconClass, fetchedAt: now };
+            saveWeatherCache();
+
             const weatherEl = document.getElementById(elementId);
             if (weatherEl) {
+                weatherEl.style.display = '';
                 weatherEl.innerHTML = `<i class="${iconClass}"></i> ${temp}°C`;
             }
         }
     } catch (error) {
-        console.error('Error fetching weather:', error);
         const weatherEl = document.getElementById(elementId);
         if (weatherEl) {
-            weatherEl.style.display = 'none';
+            if (cached && cached.temp !== undefined) {
+                weatherEl.style.display = '';
+                weatherEl.innerHTML = `<i class="${cached.iconClass || 'fa-solid fa-cloud'}"></i> ${cached.temp}°C`;
+            } else {
+                weatherEl.style.display = 'none';
+            }
         }
     }
 }
+
+function convertCurrency(amount, from, to) {
+    if (!amount || isNaN(amount)) return 0;
+    if (!from) from = 'NZD';
+    if (!to) to = 'NZD';
+    if (from === to) return amount;
+
+    const rateFrom = exchangeRates[from] || 1;
+    const rateTo = exchangeRates[to] || 1;
+
+    return amount * (rateTo / rateFrom);
+}
+
+// Generate the HTML for Bookings table
+function generateBookingsHTML() {
+    // Collect locations with accommodation
+    const bookings = locations.filter(loc => loc.placeToStay && !loc.disabled);
+
+    if (bookings.length === 0) {
+        return `<div class="empty-state" style="padding: 2rem; text-align: center;">
+            <i class="fa-solid fa-bed" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+            <p>No accommodations booked yet. Add places to stay in your stops!</p>
+        </div>`;
+    }
+
+    // Sort: unpaid first (by payment date asc), then paid (by payment date asc)
+    function sortByPaymentDate(a, b) {
+        const da = a.stayPaymentDate || '';
+        const db = b.stayPaymentDate || '';
+        return da.localeCompare(db);
+    }
+    const unpaid = bookings.filter(l => l.stayPaid !== 'yes').sort(sortByPaymentDate);
+    const paid = bookings.filter(l => l.stayPaid === 'yes').sort(sortByPaymentDate);
+
+    // Totals in settings display currency
+    const unpaidTotal = unpaid.reduce((sum, l) => sum + convertCurrency(parseFloat(l.stayAmount) || 0, l.stayCurrency || 'NZD', settingsCurrency), 0);
+    const paidTotal = paid.reduce((sum, l) => sum + convertCurrency(parseFloat(l.stayAmount) || 0, l.stayCurrency || 'NZD', settingsCurrency), 0);
+
+    const fmt = (v) => v > 0 ? `${settingsCurrency} ${v.toFixed(2)}` : '—';
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+    // Format row amount with conversion info if currency is different
+    const formatRowAmount = (loc) => {
+        const amt = parseFloat(loc.stayAmount) || 0;
+        if (!amt) return '—';
+        const cur = loc.stayCurrency || 'NZD';
+        const converted = convertCurrency(amt, cur, settingsCurrency);
+        if (cur === settingsCurrency) {
+            return `${settingsCurrency} ${converted.toFixed(2)}`;
+        } else {
+            return `${settingsCurrency} ${converted.toFixed(2)}<br><span style="font-size: 0.8em; opacity: 0.7; font-weight: normal;">(${amt.toFixed(2)} ${cur})</span>`;
+        }
+    };
+
+    let html = `<div class="bookings-print-section">
+  <h2 class="bookings-print-title"><i class="fa-solid fa-bed"></i> Bookings</h2>
+  <table class="bookings-table">
+    <thead>
+      <tr>
+        <th>Location</th>
+        <th>Accommodation</th>
+        <th>Payment Date</th>
+        <th>Amount (${settingsCurrency})</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+    // Unpaid group
+    if (unpaid.length > 0) {
+        html += `<tr class="bookings-group-header"><td colspan="5">⏳ Unpaid</td></tr>`;
+        unpaid.forEach(loc => {
+            html += `<tr class="bookings-row unpaid-row">
+        <td>${loc.name}</td>
+        <td>${loc.placeToStay}</td>
+        <td>${fmtDate(loc.stayPaymentDate)}</td>
+        <td>${formatRowAmount(loc)}</td>
+        <td><span class="booking-status unpaid">Unpaid</span></td>
+      </tr>`;
+        });
+        html += `<tr class="bookings-subtotal">
+        <td colspan="3"><strong>Unpaid Total</strong></td>
+        <td colspan="2"><strong>${fmt(unpaidTotal)}</strong></td>
+      </tr>`;
+    }
+
+    // Paid group
+    if (paid.length > 0) {
+        html += `<tr class="bookings-group-header"><td colspan="5">✅ Paid</td></tr>`;
+        paid.forEach(loc => {
+            html += `<tr class="bookings-row paid-row">
+        <td>${loc.name}</td>
+        <td>${loc.placeToStay}</td>
+        <td>${fmtDate(loc.stayPaymentDate)}</td>
+        <td>${formatRowAmount(loc)}</td>
+        <td><span class="booking-status paid">Paid</span></td>
+      </tr>`;
+        });
+        html += `<tr class="bookings-subtotal">
+        <td colspan="3"><strong>Paid Total</strong></td>
+        <td colspan="2"><strong>${fmt(paidTotal)}</strong></td>
+      </tr>`;
+    }
+
+    // Grand total
+    html += `<tr class="bookings-grand-total">
+      <td colspan="3"><strong>Grand Total</strong></td>
+      <td colspan="2"><strong>${fmt(unpaidTotal + paidTotal)}</strong></td>
+    </tr>`;
+
+    html += `</tbody></table></div>`;
+    return html;
+}
+
+// Generate the Bookings print section
+function generateBookingsPrintSection() {
+    const section = document.getElementById('bookingsPrintSection');
+    if (!section) return;
+
+    // Collect locations with accommodation
+    const bookings = locations.filter(loc => loc.placeToStay && !loc.disabled);
+
+    if (bookings.length === 0) {
+        section.innerHTML = '';
+        section.style.display = 'none';
+        return;
+    }
+
+    section.innerHTML = generateBookingsHTML();
+    section.style.display = 'block';
+}
+
+// Print Frame Scale Adjustment Helper
+function updatePrintFrameScale() {
+    const mapContainer = document.querySelector('.map-container');
+    const mapSection = document.querySelector('.map-section');
+    if (!mapContainer || !mapSection) return;
+
+    if (mapContainer.classList.contains('show-print-frame')) {
+        const a4WidthPx = 794;
+        const a4HeightPx = 1123;
+
+        const sectionWidth = mapSection.clientWidth;
+        const sectionHeight = mapSection.clientHeight;
+
+        const scale = Math.min((sectionWidth - 20) / a4WidthPx, (sectionHeight - 20) / a4HeightPx);
+
+        mapContainer.style.width = `${a4WidthPx}px`;
+        mapContainer.style.height = `${a4HeightPx}px`;
+        mapContainer.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        mapContainer.style.position = 'absolute';
+        mapContainer.style.top = '50%';
+        mapContainer.style.left = '50%';
+        mapContainer.style.transformOrigin = 'center center';
+        mapContainer.style.zIndex = '5';
+
+        if (map) map.invalidateSize();
+    } else {
+        mapContainer.style.width = '';
+        mapContainer.style.height = '';
+        mapContainer.style.transform = '';
+        mapContainer.style.position = '';
+        mapContainer.style.top = '';
+        mapContainer.style.left = '';
+        mapContainer.style.transformOrigin = '';
+        mapContainer.style.zIndex = '';
+
+        if (map) map.invalidateSize();
+    }
+}
+
+window.addEventListener('resize', () => {
+    updatePrintFrameScale();
+});
+
+// ─────────────────────────────────────────────
+// QR Code Viewer
+// ─────────────────────────────────────────────
+let qrViewerCodes = [];
+let qrViewerIndex = 0;
+
+function openQRViewer(qrCodes, startIndex = 0) {
+    if (!qrCodes || qrCodes.length === 0) return;
+    qrViewerCodes = qrCodes;
+    qrViewerIndex = startIndex;
+    renderQRViewer();
+    document.getElementById('qrViewerModal').classList.add('active');
+}
+
+function closeQRViewer() {
+    document.getElementById('qrViewerModal').classList.remove('active');
+    qrViewerCodes = [];
+    qrViewerIndex = 0;
+}
+
+function renderQRViewer() {
+    const img = document.getElementById('qrViewerImage');
+    const title = document.getElementById('qrViewerTitle');
+    const counter = document.getElementById('qrViewerCounter');
+    const prevBtn = document.getElementById('qrViewerPrev');
+    const nextBtn = document.getElementById('qrViewerNext');
+
+    if (!qrViewerCodes[qrViewerIndex]) return;
+
+    const qr = qrViewerCodes[qrViewerIndex];
+    img.src = qr.dataUrl;
+    title.textContent = qr.name || 'QR Code';
+    counter.textContent = `${qrViewerIndex + 1} of ${qrViewerCodes.length}`;
+
+    prevBtn.disabled = qrViewerIndex === 0;
+    nextBtn.disabled = qrViewerIndex === qrViewerCodes.length - 1;
+    prevBtn.style.display = qrViewerCodes.length <= 1 ? 'none' : 'flex';
+    nextBtn.style.display = qrViewerCodes.length <= 1 ? 'none' : 'flex';
+}
+
+// QR Viewer event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('qrViewerClose');
+    const prevBtn = document.getElementById('qrViewerPrev');
+    const nextBtn = document.getElementById('qrViewerNext');
+    const modal = document.getElementById('qrViewerModal');
+    const container = document.getElementById('qrViewerImageContainer');
+
+    if (closeBtn) closeBtn.addEventListener('click', closeQRViewer);
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (qrViewerIndex > 0) { qrViewerIndex--; renderQRViewer(); }
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (qrViewerIndex < qrViewerCodes.length - 1) { qrViewerIndex++; renderQRViewer(); }
+    });
+
+    // Close on background click
+    if (modal) modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeQRViewer();
+    });
+
+    // Swipe support for QR viewer
+    if (container) {
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        container.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        container.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0 && qrViewerIndex < qrViewerCodes.length - 1) {
+                    qrViewerIndex++;
+                    renderQRViewer();
+                } else if (diff < 0 && qrViewerIndex > 0) {
+                    qrViewerIndex--;
+                    renderQRViewer();
+                }
+            }
+        }, { passive: true });
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (!document.getElementById('qrViewerModal').classList.contains('active')) return;
+        if (e.key === 'Escape') closeQRViewer();
+        if (e.key === 'ArrowLeft' && qrViewerIndex > 0) { qrViewerIndex--; renderQRViewer(); }
+        if (e.key === 'ArrowRight' && qrViewerIndex < qrViewerCodes.length - 1) { qrViewerIndex++; renderQRViewer(); }
+    });
+
+    // Mobile bottom bar
+    const mobileThemeBtn = document.getElementById('mobileThemeBtn');
+    const mobileBookingsBtn = document.getElementById('mobileBookingsBtn');
+    const mobilePrintBtn = document.getElementById('mobilePrintBtn');
+    const mobileShareBtn = document.getElementById('mobileShareBtn');
+    const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+
+    if (mobileThemeBtn) mobileThemeBtn.addEventListener('click', toggleTheme);
+    if (mobileBookingsBtn) mobileBookingsBtn.addEventListener('click', () => {
+        const btn = document.getElementById('bookingsBtn');
+        if (btn) btn.click();
+    });
+    if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', () => {
+        document.getElementById('printBtn').click();
+    });
+    if (mobileShareBtn) mobileShareBtn.addEventListener('click', exportShareableCopy);
+    if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', () => {
+        document.getElementById('settingsBtn').click();
+    });
+
+    // Shareable export button in settings
+    const shareExportBtn = document.getElementById('modalExportShareBtn');
+    if (shareExportBtn) shareExportBtn.addEventListener('click', exportShareableCopy);
+});
+
+// ─────────────────────────────────────────────
+// QR Code Upload Helpers
+// ─────────────────────────────────────────────
+function handleQRUpload(file, tripIndex, isModal = false) {
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onloadend = function () {
+        const dataUrl = reader.result;
+        const name = file.name.replace(/\.[^/.]+$/, '') || 'QR Code';
+
+        if (isModal) {
+            // Add to modal day trips
+            if (!modalDayTrips[tripIndex].qrCodes) modalDayTrips[tripIndex].qrCodes = [];
+            modalDayTrips[tripIndex].qrCodes.push({
+                id: 'qr_' + Date.now(),
+                name: name,
+                dataUrl: dataUrl
+            });
+            renderModalDayTrips();
+        } else {
+            // Direct card add — find the trip and add to it
+            // This path is for inline card add-qr buttons
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleCameraCapture(tripIndex) {
+    // Create a temporary file input with camera capture
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment'; // Use rear camera
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+            handleQRUpload(e.target.files[0], tripIndex, true);
+        }
+        input.remove();
+    });
+
+    input.click();
+}
+
+function addQRToCardTrip(locId, tripId) {
+    const loc = locations.find(l => l.id === locId);
+    if (!loc || !loc.dayTrips) return;
+    const trip = loc.dayTrips.find(t => t.id === tripId);
+    if (!trip) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = function () {
+            if (!trip.qrCodes) trip.qrCodes = [];
+            trip.qrCodes.push({
+                id: 'qr_' + Date.now(),
+                name: file.name.replace(/\.[^/.]+$/, '') || 'QR Code',
+                dataUrl: reader.result
+            });
+            renderApp();
+            saveData();
+        };
+        reader.readAsDataURL(file);
+        input.remove();
+    });
+
+    input.click();
+}
+
+// ─────────────────────────────────────────────
+// Shareable Export (Privacy-Friendly)
+// ─────────────────────────────────────────────
+function exportShareableCopy() {
+    const activeLocations = locations.filter(l => !l.disabled);
+    if (activeLocations.length === 0) {
+        alert('No active locations to export.');
+        return;
+    }
+
+    // Calculate trip title from most frequent tag
+    let tagCounts = {};
+    activeLocations.forEach(loc => {
+        if (loc.tags) {
+            loc.tags.split(',').forEach(tag => {
+                const t = tag.trim();
+                if (t) tagCounts[t] = (tagCounts[t] || 0) + 1;
+            });
+        }
+    });
+    let tripTitle = 'Trip Overview';
+    let maxCount = 0;
+    for (const [tag, count] of Object.entries(tagCounts)) {
+        if (count > maxCount) { maxCount = count; tripTitle = `${tag} Trip`; }
+    }
+
+    // Build location HTML cards
+    let cardsHTML = '';
+    activeLocations.forEach((loc, idx) => {
+        const num = idx + 1;
+
+        // Date
+        let dateHTML = '';
+        if (loc.stopDate) {
+            const d = new Date(loc.stopDate);
+            const datePart = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const dayPart = d.toLocaleDateString('en-GB', { weekday: 'short' });
+            dateHTML = `<div class="stop-date">📅 ${datePart} (${dayPart})</div>`;
+        }
+
+        // Travel mode icon
+        const modeIcons = {
+            'walking': '🚶', 'biking': '🚴', 'car': '🚗',
+            'train': '🚆', 'boat': '⛵', 'plane': '✈️'
+        };
+        let modeHTML = '';
+        if (loc.travelMode) {
+            modeHTML = `<span class="travel-mode">${modeIcons[loc.travelMode] || '🚗'} ${loc.travelMode}</span>`;
+        }
+
+        // Flight details (only when mode is plane)
+        let flightHTML = '';
+        if (loc.travelMode === 'plane') {
+            let flightParts = [];
+            if (loc.departureTime) flightParts.push(`Departure: ${loc.departureTime}`);
+            if (loc.ticketNumber) flightParts.push(`Flight: ${loc.ticketNumber}`);
+            if (flightParts.length > 0) {
+                flightHTML = `<div class="flight-details">✈️ ${flightParts.join(' &bull; ')}</div>`;
+            }
+        }
+
+        // Day trips
+        let tripsHTML = '';
+        if (loc.dayTrips && loc.dayTrips.length > 0) {
+            tripsHTML = '<div class="day-trips"><strong>Activities:</strong><ul>';
+            loc.dayTrips.forEach((trip, ti) => {
+                const subNum = String(ti + 1).padStart(2, '0');
+                tripsHTML += `<li><span class="trip-num">${num}-${subNum}</span> ${trip.name}${trip.notes ? ` — <em>${trip.notes}</em>` : ''}</li>`;
+            });
+            tripsHTML += '</ul></div>';
+        }
+
+        // Tags
+        let tagsHTML = '';
+        if (loc.tags) {
+            const tagList = loc.tags.split(',').map(t => t.trim()).filter(t => t);
+            if (tagList.length > 0) {
+                tagsHTML = `<div class="tags">${tagList.map(t => `<span class="tag">${t}</span>`).join('')}</div>`;
+            }
+        }
+
+        cardsHTML += `
+        <div class="stop-card">
+            <div class="stop-header">
+                <div class="stop-number">${num}</div>
+                <div class="stop-info">
+                    <h2>${loc.name}</h2>
+                    ${dateHTML}
+                </div>
+                ${modeHTML}
+            </div>
+            ${flightHTML}
+            ${tripsHTML}
+            ${tagsHTML}
+        </div>`;
+    });
+
+    const exportDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${tripTitle}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 700px; margin: 0 auto; }
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 0.3rem;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .stop-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .stop-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5, #ff0055);
+        }
+        .stop-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+        }
+        .stop-number {
+            width: 36px; height: 36px;
+            background: #00d2ff;
+            color: #0f172a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .stop-info { flex: 1; }
+        .stop-info h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            color: #f8fafc;
+        }
+        .stop-date { font-size: 0.85rem; color: #94a3b8; margin-top: 2px; }
+        .travel-mode {
+            font-size: 0.85rem;
+            background: rgba(0,210,255,0.1);
+            color: #00d2ff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+        .flight-details {
+            background: rgba(0,210,255,0.06);
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 0.8rem;
+        }
+        .day-trips { margin-top: 0.5rem; }
+        .day-trips strong { color: #f59e0b; font-size: 0.85rem; }
+        .day-trips ul { list-style: none; margin-top: 0.3rem; }
+        .day-trips li {
+            padding: 0.3rem 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .day-trips li:last-child { border-bottom: none; }
+        .trip-num {
+            display: inline-block;
+            background: rgba(245,158,11,0.15);
+            color: #f59e0b;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-right: 0.4rem;
+        }
+        .tags { margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+        .tag {
+            background: rgba(0,210,255,0.1);
+            color: #00d2ff;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,210,255,0.2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.4rem; }
+            .stop-info h2 { font-size: 1rem; }
+        }
+        @media print {
+            body {
+                background: white;
+                color: #1e293b;
+                padding: 0.5rem;
+            }
+            .stop-card {
+                background: none;
+                border: 1px solid #e2e8f0;
+                break-inside: avoid;
+            }
+            .stop-card::before { background: linear-gradient(90deg, #3a7bd5, #0ea5e9); }
+            .stop-number { background: #1e293b; color: white; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .stop-info h2 { color: #1e293b; }
+            .stop-date { color: #64748b; }
+            h1 { -webkit-text-fill-color: #3a7bd5; }
+            .subtitle { color: #64748b; border-bottom-color: #e2e8f0; }
+            .travel-mode { background: #f0f9ff; color: #0369a1; }
+            .tag { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+            .trip-num { background: #fef3c7; color: #92400e; }
+            .day-trips li { border-bottom-color: #f1f5f9; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>${tripTitle}</h1>
+        <div class="subtitle">${activeLocations.length} stops &bull; Generated ${exportDate}</div>
+        ${cardsHTML}
+    </div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trip_overview_${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+

@@ -3,24 +3,31 @@
     --secondary-color: #3a7bd5;
     --accent-color: #ff0055;
     --bg-dark: #0f172a;
-    --bg-card: rgba(30, 41, 59, 0.7);
+    --bg-card: rgba(30, 41, 59, 0.75);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
-    --border-color: rgba(255, 255, 255, 0.1);
+    --border-color: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     --gradient-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     --font-heading: 'Orbitron', sans-serif;
     --font-body: 'Outfit', sans-serif;
+    --card-glow: 0 0 20px rgba(0, 210, 255, 0.05);
+    --mobile-bottom-height: 56px;
 }
 
 .light-mode {
-    --bg-dark: #f0f2f5;
-    --bg-card: rgba(255, 255, 255, 0.8);
+    --bg-dark: #f5f6fa;
+    --bg-card: rgba(255, 255, 255, 0.85);
     --text-main: #1e293b;
     --text-muted: #64748b;
-    --border-color: rgba(0, 0, 0, 0.1);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-    --gradient-bg: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --glass-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.08);
+    --gradient-bg: linear-gradient(135deg, #f5f6fa 0%, #e8ecf4 100%);
+    --card-glow: 0 0 20px rgba(58, 123, 213, 0.06);
+}
+
+html {
+    height: 100%;
 }
 
 * {
@@ -33,7 +40,7 @@ body {
     font-family: var(--font-body);
     background: var(--bg-dark);
     color: var(--text-main);
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
     background-image:
         radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
@@ -45,11 +52,11 @@ body {
 .app-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     max-width: 1600px;
     margin: 0 auto;
-    padding: 1rem;
-    gap: 1rem;
+    padding: 0.5rem 0.25rem;
+    gap: 0.5rem;
 }
 
 /* Header */
@@ -57,20 +64,50 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2rem;
+    padding: 0.8rem 1rem;
     background: var(--bg-card);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-radius: 16px;
     border: 1px solid var(--border-color);
     box-shadow: var(--glass-shadow);
+    position: relative;
+}
+
+.main-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 210, 255, 0.3), transparent);
+    border-radius: 1px;
+}
+
+.light-mode .main-header::before {
+    background: linear-gradient(90deg, transparent, rgba(58, 123, 213, 0.2), transparent);
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: .8rem;
     font-size: 1.8rem;
     color: var(--primary-color);
+}
+
+.logo-icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.35));
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.logo:hover .logo-icon {
+    transform: scale(1.08) rotate(3deg);
+    filter: drop-shadow(0 0 12px rgba(0, 210, 255, 0.6));
 }
 
 .logo h1 {
@@ -126,13 +163,15 @@ body {
 .main-content {
     display: flex;
     flex: 1;
-    gap: 1.5rem;
+    gap: 0;
     min-height: 0;
+    position: relative;
 }
 
 /* Map Section */
 .map-section {
     flex: 2;
+    min-width: 200px;
     background: var(--bg-card);
     border-radius: 16px;
     overflow: hidden;
@@ -192,7 +231,7 @@ body {
 /* Itinerary Section */
 .itinerary-section {
     flex: 1;
-    min-width: 400px;
+    min-width: 240px;
     background: var(--bg-card);
     backdrop-filter: blur(12px);
     border-radius: 16px;
@@ -204,8 +243,11 @@ body {
 }
 
 .itinerary-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 0.75rem;
+    border-bottom: 1px solid transparent;
+    background-image: linear-gradient(var(--bg-card), var(--bg-card)), linear-gradient(90deg, transparent, rgba(0, 210, 255, 0.2), transparent);
+    background-origin: padding-box, border-box;
+    background-clip: padding-box, border-box;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -228,7 +270,7 @@ body {
     flex: 1 1 0%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 1.5rem;
+    padding: 0.75rem 0.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -246,11 +288,11 @@ body {
 
 /* Cards */
 .location-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     cursor: pointer;
     height: 100px;
@@ -258,21 +300,54 @@ body {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    box-shadow: var(--card-glow);
+}
+
+.location-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-color));
+    background-size: 200% 100%;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    z-index: 5;
+}
+
+.location-card:hover::before,
+.location-card.expanded::before {
+    opacity: 1;
 }
 
 .location-card.expanded {
     height: auto;
     cursor: grab;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(0, 210, 255, 0.15);
+}
+
+.light-mode .location-card {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .location-card.expanded {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(58, 123, 213, 0.15);
 }
 
 .location-card:hover {
     background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), var(--card-glow);
+    transform: translateY(-1px);
 }
 
 .location-card.expanded:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
 }
 
 .location-card.sortable-ghost {
@@ -291,8 +366,13 @@ body {
     background: rgba(255, 255, 255, 0.02);
 }
 
+.location-card.disabled::before {
+    display: none;
+}
+
 .location-card.disabled:hover {
     opacity: 0.8;
+    transform: none;
 }
 
 .card-action-btn.disable {
@@ -326,7 +406,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to bottom, transparent 0%, rgba(15, 23, 42, 0.9) 100%);
+    background: linear-gradient(to bottom, transparent 20%, rgba(15, 23, 42, 0.5) 60%, rgba(15, 23, 42, 0.85) 100%);
 }
 
 .card-header-overlay {
@@ -475,11 +555,16 @@ body {
 .fun-fact {
     margin-top: 0.8rem;
     padding: 0.8rem;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(245, 158, 11, 0.06);
     border-radius: 8px;
     font-size: 0.85rem;
     font-style: italic;
-    border-left: 3px solid #475569;
+    border-left: 3px solid rgba(245, 158, 11, 0.5);
+}
+
+.light-mode .fun-fact {
+    background: rgba(245, 158, 11, 0.08);
+    border-left-color: #f59e0b;
 }
 
 /* Modal */
@@ -488,6 +573,8 @@ body {
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.7);
@@ -508,10 +595,15 @@ body {
     max-width: 600px;
     border-radius: 16px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--glass-shadow);
-    max-height: 90vh;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+    max-height: 90%;
     display: flex;
     flex-direction: column;
+}
+
+.light-mode .modal-content {
+    background: #f8fafc;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
 }
 
 .modal-header {
@@ -691,29 +783,26 @@ textarea:focus {
 
     /* Keep app wrapper fixed height to enable internal scrolling */
     .app-wrapper {
-        height: 100vh;
+        height: 100%;
         overflow: hidden;
+        padding-bottom: 0;
     }
 
     .main-content {
         flex-direction: column;
         min-height: 0;
-        /* Crucial for nested flex scrolling */
     }
 
     .map-section {
-        height: 40vh;
-        /* Use vh instead of fixed px for better scaling */
-        min-height: 300px;
+        height: 35vh;
+        min-height: 200px;
         flex: none;
     }
 
     .itinerary-section {
         min-width: 0;
         flex: 1;
-        /* Take remaining space */
         min-height: 0;
-        /* Crucial for nested flex scrolling */
         display: flex;
         flex-direction: column;
     }
@@ -721,6 +810,8 @@ textarea:focus {
     .itinerary-list {
         flex: 1;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: calc(var(--mobile-bottom-height) + 0.5rem);
     }
 
     /* Fix card expansion on mobile */
@@ -736,6 +827,97 @@ textarea:focus {
 
     /* Make action buttons always visible on mobile */
     .card-actions {
+        opacity: 1 !important;
+    }
+
+    /* Mobile Modal Dialogs */
+    .modal:not(.active) {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+
+    .modal.active {
+        display: flex !important;
+        pointer-events: auto !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        /* Avoid vw/vh units — Android WebView miscalculates them when system bars are hidden */
+        width: 100% !important;
+        height: 100% !important;
+        background: rgba(0, 0, 0, 0.75) !important;
+        backdrop-filter: blur(6px) !important;
+        z-index: 3000 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 1rem !important;
+    }
+
+    .modal-content {
+        width: 92% !important;
+        max-width: 550px !important;
+        /* Use percentage of parent (the fixed overlay) instead of vh — WebView-safe */
+        height: 85% !important;
+        max-height: none !important;
+        border-radius: 16px !important;
+        border: 1px solid var(--border-color) !important;
+        margin: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        background: #1e293b !important;
+        z-index: 3001 !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+        overflow: visible !important;
+    }
+
+    .light-mode .modal-content {
+        background: #f8fafc !important;
+    }
+
+    .modal-header {
+        padding: 1rem 1.2rem !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        background: inherit !important;
+    }
+
+    .modal-body {
+        padding: 1rem !important;
+        flex: 1 1 0% !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        min-height: 0 !important;
+    }
+
+    #locationForm {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    /* Larger form inputs to prevent iOS zoom */
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+        padding: 0.85rem !important;
+    }
+
+    /* Day trip action buttons larger on mobile */
+    .day-trip-action-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 0.8rem;
+    }
+
+    .day-trip-actions {
         opacity: 1 !important;
     }
 }
@@ -795,126 +977,222 @@ textarea:focus {
     }
 }
 
-/* Mobile Improvements (Portrait) */
-@media (max-width: 600px) {
-    body {
-        height: auto;
-        overflow: auto;
-    }
+/* ─────────────────────────────────────────────
+   Android Native App & Mobile Layout Rules
+   ───────────────────────────────────────────── */
 
-    .app-wrapper {
-        height: auto;
-        min-height: 100vh;
-    }
-
-    .main-header {
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.75rem;
-    }
-
-    .header-controls {
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 0.3rem;
-    }
-
-    .btn {
-        padding: 0.4rem 0.6rem;
-        font-size: 0.8rem;
-        gap: 0.3rem;
-    }
-
-    .main-content {
-        flex-direction: column;
-    }
-
-    .map-section {
-        height: 40vh;
-        min-height: 300px;
-        flex: none;
-    }
-
-    .itinerary-section {
-        min-width: 0;
-        height: auto;
-        flex: none;
-    }
-
-    .itinerary-list {
-        overflow-y: visible;
-    }
-
-    .location-card.expanded {
-        height: auto !important;
-        max-height: none !important;
-    }
-
-    .card-content {
-        max-height: none !important;
-        overflow: visible !important;
-    }
-
-    .card-actions {
-        opacity: 1 !important;
-    }
+/* Hide top header bar ONLY in Android Native App */
+.is-android-app .main-header {
+    display: none !important;
 }
 
-/* Mobile Landscape Mode - Aggressive Override */
-@media (max-width: 900px) and (orientation: landscape) {
+/* Mobile Bottom Action Bar */
+.mobile-bottom-bar {
+    display: none;
+}
 
-    html,
-    body {
-        height: auto !important;
-        min-height: 100% !important;
-        overflow-y: auto !important;
-    }
+.is-android-app .mobile-bottom-bar {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--mobile-bottom-height);
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-color);
+    z-index: 1500;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 0.5rem;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+}
 
-    .app-wrapper {
-        height: auto !important;
-        min-height: 100vh !important;
-        overflow: visible !important;
-    }
+.mobile-bottom-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 210, 255, 0.2), transparent);
+}
 
-    .main-content {
+.mobile-bottom-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.15rem;
+    cursor: pointer;
+    padding: 0.4rem 0.8rem;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    min-width: 48px;
+    min-height: 44px;
+    font-family: var(--font-body);
+}
+
+.mobile-bottom-btn span {
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.mobile-bottom-btn:active {
+    background: rgba(0, 210, 255, 0.1);
+    color: var(--primary-color);
+    transform: scale(0.95);
+}
+
+.light-mode .mobile-bottom-bar {
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Android App Container Layout */
+.is-android-app .app-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    padding: 0 0 var(--mobile-bottom-height) 0 !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.is-android-app .main-content {
+    display: flex !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+    gap: 0.25rem !important;
+}
+
+/* Android App Portrait Layout */
+@media (orientation: portrait) {
+    .is-android-app .main-content {
         flex-direction: column !important;
-        height: auto !important;
     }
 
-    .map-section {
-        height: 60vh !important;
-        min-height: 250px !important;
+    .is-android-app .map-section {
+        display: block !important;
+        height: 40% !important;
+        min-height: 180px !important;
         flex: none !important;
+        width: 100% !important;
+        position: relative !important;
+        border-radius: 12px !important;
     }
 
-    .itinerary-section {
-        height: auto !important;
-        overflow: visible !important;
-        flex: none !important;
+    .is-android-app .itinerary-section {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        border-radius: 12px !important;
     }
 
-    .itinerary-list {
-        overflow-y: visible !important;
-        flex: none !important;
+    .is-android-app .itinerary-list {
+        display: block !important;
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
     }
 }
 
-
-/* Mobile Button Fixes */
-@media (max-width: 900px) {
-    .card-action-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 1.1rem;
+/* Android App Landscape Layout */
+@media (orientation: landscape) {
+    .is-android-app .main-content {
+        flex-direction: row !important;
     }
 
-    .card-header-overlay {
-        right: 140px;
+    .is-android-app .map-section {
+        display: block !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        flex: 1 !important;
+        position: relative !important;
+        border-radius: 12px !important;
     }
 
-    .card-actions {
-        opacity: 1 !important;
+    .is-android-app .itinerary-section {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        border-radius: 12px !important;
+    }
+
+    .is-android-app .itinerary-list {
+        display: block !important;
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* Web Mobile Media Queries (Standard Browser) */
+@media (max-width: 600px) {
+    .mobile-bottom-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: var(--mobile-bottom-height);
+        background: var(--bg-card);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-top: 1px solid var(--border-color);
+        z-index: 1500;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 0.5rem;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .app-wrapper {
+        padding-bottom: var(--mobile-bottom-height);
+    }
+
+    .logo h1 {
+        display: none;
+    }
+
+    .header-controls .mobile-hide {
+        display: none !important;
+    }
+
+    .main-content {
+        flex-direction: column;
+    }
+
+    .map-section {
+        height: 35vh;
+        min-height: 180px;
+        flex: none;
+    }
+
+    .itinerary-section {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .itinerary-list {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .map-resizer-container.mobile-resizer {
+        display: flex !important;
     }
 }
 
@@ -955,11 +1233,22 @@ textarea:focus {
     .map-section {
         display: block !important;
         order: 2;
-        page-break-before: always;
-        page-break-inside: avoid;
-        height: 95vh !important;
+        page-break-before: auto !important;
+        break-before: auto !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        height: auto !important;
         width: 100% !important;
         margin-top: 0;
+    }
+
+    .map-container {
+        page-break-before: always !important;
+        break-before: page !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        height: 275mm !important;
+        width: 100% !important;
     }
 
     body.dark-map-theme .leaflet-tile-pane {
@@ -1191,16 +1480,16 @@ textarea:focus {
     .no-print {
         display: none !important;
     }
-    
+
     .empty-day-trips {
         display: none !important;
     }
-    
+
     .day-trip-item {
         background: none !important;
         border-color: #ccc !important;
     }
-    
+
     .day-trips-section {
         background: none !important;
         border-left: 2px solid #666 !important;
@@ -1836,10 +2125,8 @@ input:checked+.slider:before {
 }
 
 .group-content {
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+    transition: opacity 0.3s;
     overflow: hidden;
-    max-height: 20000px;
-    opacity: 1;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -1848,10 +2135,7 @@ input:checked+.slider:before {
 }
 
 .group-header.collapsed+.group-content {
-    max-height: 0;
-    opacity: 0;
-    pointer-events: none;
-    padding-bottom: 0;
+    display: none !important;
 }
 
 /* Suggested Tags UI */
@@ -1941,15 +2225,12 @@ input:checked+.slider:before {
 .map-container.show-print-frame::after {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    /* Anchor to the top-left of the 210mm x 297mm print area */
-    margin-left: -105mm; 
-    margin-top: -148.5mm;
-    width: 190mm; /* 210mm - 20mm right margin */
-    height: 267mm; /* 297mm - 30mm bottom margin */
-    max-width: 95vw;
-    max-height: 95vh;
+    top: 15mm;
+    left: 10mm;
+    width: 190mm;
+    /* 210mm - 20mm margins */
+    height: 267mm;
+    /* 297mm - 30mm margins */
     border: 3px dashed rgba(255, 0, 85, 0.8);
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
     pointer-events: none;
@@ -1959,10 +2240,8 @@ input:checked+.slider:before {
 .map-container.show-print-frame::before {
     content: 'A4';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-left: -105mm;
-    margin-top: -148.5mm;
+    top: 15mm;
+    left: 10mm;
     background: rgba(255, 0, 85, 0.8);
     color: white;
     padding: 2px 8px;
@@ -1991,10 +2270,721 @@ body.print-preview-mode .map-section {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
-        width: 210mm !important; /* Use exact A4 width for Leaflet calculations */
-        height: 297mm !important; /* Use exact A4 height */
+        width: 210mm !important;
+        /* Use exact A4 width for Leaflet calculations */
+        height: 297mm !important;
+        /* Use exact A4 height */
         z-index: 9999 !important;
         display: block !important;
-        opacity: 0; 
+        opacity: 0;
+    }
+}
+
+/* Drag Resizer Handle on Map Section Edge */
+.resizer-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ew-resize;
+    user-select: none;
+    touch-action: none;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.resizer-handle:hover,
+.resizer-handle.active {
+    background: rgba(0, 210, 255, 0.25) !important;
+    border-left-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+
+.resizer-handle i {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+    transform: rotate(90deg);
+}
+
+.light-mode .resizer-handle {
+    background: rgba(0, 0, 0, 0.04);
+    border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.light-mode .resizer-handle i {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.light-mode .resizer-handle:hover,
+.light-mode .resizer-handle.active {
+    background: rgba(58, 123, 213, 0.2) !important;
+    border-left-color: var(--secondary-color) !important;
+    color: var(--secondary-color) !important;
+}
+
+@media (max-width: 768px) {
+    .resizer-handle {
+        right: 0;
+        left: 0;
+        bottom: 0;
+        top: auto;
+        width: 100%;
+        height: 20px;
+        cursor: ns-resize;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .resizer-handle i {
+        transform: rotate(0deg);
+    }
+}
+
+/* ─────────────────────────────────────────────
+   Bookings Table & Modal Styling
+   ───────────────────────────────────────────── */
+#bookingsPrintSection {
+    display: none;
+}
+
+.bookings-print-section {
+    font-family: var(--font-body);
+}
+
+.bookings-print-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 2px solid #9b59b6;
+    padding-bottom: 0.5rem;
+}
+
+.bookings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.bookings-table th {
+    background: var(--bg-dark);
+    color: var(--text-main);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.bookings-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    color: var(--text-main);
+}
+
+.bookings-group-header td {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.light-mode .bookings-group-header td {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.unpaid-row {
+    background: rgba(239, 68, 68, 0.04);
+}
+
+.paid-row {
+    background: rgba(22, 163, 74, 0.04);
+}
+
+.bookings-subtotal td {
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 2px solid var(--border-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.bookings-grand-total td {
+    background: rgba(255, 255, 255, 0.05);
+    border-top: 3px double var(--border-color);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.booking-status {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.booking-status.unpaid {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.booking-status.paid {
+    background: rgba(22, 163, 74, 0.15);
+    color: #22c55e;
+}
+
+@media print {
+    /* Hide interactive controls in print mode */
+    .resizer-handle,
+    .main-header,
+    .header-controls,
+    .itinerary-controls,
+    .mobile-bottom-bar,
+    .map-overlay-info,
+    .add-qr-btn,
+    .qr-thumbnails {
+        display: none !important;
+    }
+
+    /* Force 100% full A4 page width on containers */
+    html, body, .app-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        color: black !important;
+    }
+
+    .main-content {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* 1. Itinerary Section (Order 1 - Prints First) */
+    .itinerary-section {
+        order: 1 !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        margin: 0 0 10mm 0 !important;
+    }
+
+    .itinerary-header {
+        border-bottom: 2px solid #3a7bd5 !important;
+        margin-bottom: 1rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    .itinerary-header h2 {
+        color: #1e293b !important;
+        font-size: 18pt !important;
+    }
+
+    .itinerary-list {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .location-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 1px solid #cbd5e1 !important;
+        background: white !important;
+        color: black !important;
+        box-shadow: none !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .location-card h3,
+    .location-card p,
+    .location-card span {
+        color: black !important;
+    }
+
+    /* 2. Booking Costs Table (Order 2 - Prints Second) */
+    #bookingsPrintSection {
+        order: 2 !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        page-break-before: always !important;
+        break-before: page !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        margin: 0 0 10mm 0 !important;
+        padding-top: 5mm !important;
+    }
+
+    .bookings-print-section {
+        font-family: 'Outfit', sans-serif !important;
+        page-break-inside: avoid !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* 3. Full A4 Map (Order 3 - Prints Last on Dedicated Full Page) */
+    .map-section {
+        order: 3 !important;
+        width: 100% !important;
+        height: 270mm !important;
+        min-height: 270mm !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+        flex: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+        display: block !important;
+        position: relative !important;
+        page-break-before: always !important;
+        break-before: page !important;
+        overflow: hidden !important;
+    }
+
+    .map-container,
+    #map,
+    #map .leaflet-container,
+    #map .leaflet-pane {
+        width: 100% !important;
+        height: 270mm !important;
+        min-height: 270mm !important;
+        max-width: 100% !important;
+    }
+}
+
+    .bookings-print-section {
+        font-family: 'Outfit', sans-serif !important;
+        page-break-inside: avoid !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .bookings-print-title {
+        font-size: 16pt !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        margin-bottom: 0.6rem !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        border-bottom: 2px solid #9b59b6 !important;
+        padding-bottom: 0.3rem !important;
+        width: 100% !important;
+    }
+
+    .bookings-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 9pt !important;
+        margin-top: 0.5rem !important;
+    }
+
+    .bookings-table th {
+        background: #1e293b !important;
+        color: white !important;
+        padding: 5px 8px !important;
+        text-align: left !important;
+        font-weight: 600 !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .bookings-table td {
+        padding: 5px 8px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        vertical-align: middle !important;
+        color: black !important;
+    }
+
+    .bookings-group-header td {
+        background: #f1f5f9 !important;
+        font-weight: 700 !important;
+        font-size: 9pt !important;
+        color: #475569 !important;
+        padding: 4px 8px !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .unpaid-row {
+        background: #fff7f7 !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .paid-row {
+        background: #f0fdf4 !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .bookings-subtotal td {
+        background: #f8fafc !important;
+        border-top: 2px solid #cbd5e1 !important;
+        font-size: 9pt !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .bookings-grand-total td {
+        background: #e2e8f0 !important;
+        border-top: 3px double #94a3b8 !important;
+        font-size: 10pt !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .booking-status {
+        display: inline-block !important;
+        padding: 2px 8px !important;
+        border-radius: 10px !important;
+        font-size: 8pt !important;
+        font-weight: 600 !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+
+    .booking-status.unpaid {
+        background: #fee2e2 !important;
+        color: #dc2626 !important;
+    }
+
+    .booking-status.paid {
+        background: #dcfce7 !important;
+        color: #16a34a !important;
+    }
+}
+
+/* ─────────────────────────────────────────────
+   QR Code Thumbnails on Day Trip Items
+   ───────────────────────────────────────────── */
+.qr-thumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.qr-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 210, 255, 0.3);
+    object-fit: cover;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.qr-thumb:hover {
+    border-color: var(--primary-color);
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 210, 255, 0.3);
+}
+
+.add-qr-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px dashed rgba(0, 210, 255, 0.3);
+    background: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.add-qr-btn:hover {
+    border-color: var(--primary-color);
+    background: rgba(0, 210, 255, 0.1);
+}
+
+/* QR Code Upload Section in Modal */
+.qr-upload-section {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 210, 255, 0.04);
+    border-radius: 8px;
+    border: 1px dashed rgba(0, 210, 255, 0.15);
+}
+
+.qr-upload-section label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.qr-upload-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.qr-upload-btn {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    background: rgba(0, 210, 255, 0.08);
+    border: 1px solid rgba(0, 210, 255, 0.2);
+    border-radius: 6px;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    transition: all 0.2s;
+}
+
+.qr-upload-btn:hover {
+    background: rgba(0, 210, 255, 0.15);
+    border-color: var(--primary-color);
+}
+
+.qr-upload-btn input[type="file"] {
+    display: none;
+}
+
+.qr-preview-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.qr-preview-item {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 210, 255, 0.2);
+}
+
+.qr-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.qr-preview-item .qr-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    transition: transform 0.2s;
+}
+
+.qr-preview-item .qr-remove:hover {
+    transform: scale(1.2);
+}
+
+/* ─────────────────────────────────────────────
+   Full-Screen QR Code Viewer
+   ───────────────────────────────────────────── */
+#qrViewerModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 5000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+#qrViewerModal.active {
+    display: flex;
+}
+
+.qr-viewer-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.qr-viewer-title {
+    color: white;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.qr-viewer-counter {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+}
+
+.qr-viewer-close {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.qr-viewer-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.qr-viewer-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    padding: 2rem;
+    touch-action: pan-y;
+}
+
+.qr-viewer-image-container img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 12px;
+    box-shadow: 0 0 40px rgba(0, 210, 255, 0.1);
+    background: white;
+    padding: 1rem;
+}
+
+.qr-viewer-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.qr-viewer-nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.qr-viewer-nav.prev {
+    left: 1rem;
+}
+
+.qr-viewer-nav.next {
+    right: 1rem;
+}
+
+.qr-viewer-nav[disabled] {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ─────────────────────────────────────────────
+   Tag Group Day Count Badge
+   ───────────────────────────────────────────── */
+.group-day-count {
+    font-size: 0.7rem;
+    color: var(--primary-color);
+    background: rgba(0, 210, 255, 0.08);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid rgba(0, 210, 255, 0.15);
+}
+
+.light-mode .group-day-count {
+    background: rgba(58, 123, 213, 0.08);
+    color: var(--secondary-color);
+    border-color: rgba(58, 123, 213, 0.15);
+}
+
+/* ─────────────────────────────────────────────
+   Shareable Export Button
+   ───────────────────────────────────────────── */
+.btn-export-share {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.btn-export-share:hover {
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    transform: translateY(-1px);
+}
+
+@media print {
+
+    .qr-thumbnails,
+    .add-qr-btn {
+        display: none !important;
+    }
+
+    .mobile-bottom-bar {
+        display: none !important;
     }
 }
